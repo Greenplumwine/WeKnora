@@ -21,8 +21,7 @@ aliases: [Home, Index, wiki首页]
 
 | 页面 | 简介 |
 |------|------|
-| [知识图谱](核心功能/知识图谱.md) | Neo4j 知识图谱的快速开始与使用 |
-| [开启知识图谱功能](核心功能/开启知识图谱功能.md) | 知识图谱功能的完整启用流程 |
+| [知识图谱](核心功能/知识图谱.md) | Neo4j 知识图谱的启用流程与使用 |
 | [文档分块策略](核心功能/文档分块策略.md) | 自适应三级分块策略与设置参考 |
 | [MCP功能使用说明](核心功能/MCP功能使用说明.md) | MCP 服务的用户操作指南 |
 | [MCP工具人工审核](核心功能/MCP工具人工审核.md) | MCP 危险工具的人工审核机制 |
@@ -98,7 +97,6 @@ graph TB
     项目概述 --> LITE[Lite与标准版区别]
 
     核心功能 --> KG[知识图谱]
-    核心功能 --> KGSetup[开启知识图谱功能]
     核心功能 --> Chunking[文档分块策略]
     核心功能 --> MCP[MCP功能使用说明]
     核心功能 --> MCPApproval[MCP工具人工审核]
@@ -133,7 +131,7 @@ graph TB
 
     API参考 --> APIOverview[API文档概览]
 
-    KG -.-> KGSetup
+    KG -.-> Chunking
     MCP -.-> BuiltinMCP
     MCP -.-> MCPApproval
     BuiltinMCP -.-> BuiltinModel
