@@ -23,8 +23,7 @@ aliases: [Home, Index, wiki首页]
 |------|------|
 | [知识图谱](核心功能/知识图谱.md) | Neo4j 知识图谱的启用流程与使用 |
 | [文档分块策略](核心功能/文档分块策略.md) | 自适应三级分块策略与设置参考 |
-| [MCP功能使用说明](核心功能/MCP功能使用说明.md) | MCP 服务的用户操作指南 |
-| [MCP工具人工审核](核心功能/MCP工具人工审核.md) | MCP 危险工具的人工审核机制 |
+| [MCP功能使用说明](核心功能/MCP功能使用说明.md) | MCP 服务的用户操作指南与工具人工审核 |
 | [内置MCP服务管理](核心功能/内置MCP服务管理.md) | 内置 MCP 服务的系统级管理 |
 | [内置模型管理](核心功能/内置模型管理.md) | 内置模型的系统级管理 |
 | [内置智能体管理](核心功能/内置智能体管理.md) | 内置智能体的 YAML 配置与模型字段 |
@@ -97,7 +96,6 @@ graph TB
     核心功能 --> KG[知识图谱]
     核心功能 --> Chunking[文档分块策略]
     核心功能 --> MCP[MCP功能使用说明]
-    核心功能 --> MCPApproval[MCP工具人工审核]
     核心功能 --> BuiltinMCP[内置MCP服务管理]
     核心功能 --> BuiltinModel[内置模型管理]
     核心功能 --> BuiltinAgent[内置智能体管理]
@@ -129,7 +127,6 @@ graph TB
 
     KG -.-> Chunking
     MCP -.-> BuiltinMCP
-    MCP -.-> MCPApproval
     BuiltinMCP -.-> BuiltinModel
     BuiltinModel -.-> BuiltinAgent
     Skills -.-> IM
