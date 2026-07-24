@@ -38,9 +38,7 @@ aliases: [Home, Index, wiki首页]
 | [数据源导入开发](集成扩展/数据源导入开发.md) | 外部平台数据自动同步与导入 |
 | [添加网络搜索引擎](集成扩展/添加网络搜索引擎.md) | 扩展新的网络搜索 Provider |
 | [集成向量数据库](集成扩展/集成向量数据库.md) | 集成新的向量数据库检索引擎 |
-| [Embed组件集成](集成扩展/Embed组件集成.md) | 网站嵌入 WeKnora 智能体组件 |
-| [Embed安全模式](集成扩展/Embed安全模式.md) | 发布 Token 不落浏览器的安全模式 |
-| [Embed子域部署](集成扩展/Embed子域部署.md) | Embed 独立子域部署（可选） |
+| [网页嵌入集成](集成扩展/网页嵌入集成.md) | 网站嵌入 WeKnora 智能体（iframe/浮窗/安全模式/子域部署） |
 | [Langfuse集成](集成扩展/Langfuse集成.md) | Langfuse 全链路可观测性追踪 |
 
 ## 安全与认证
@@ -109,9 +107,7 @@ graph TB
     集成扩展 --> DS[数据源导入开发]
     集成扩展 --> WebSearch[添加网络搜索引擎]
     集成扩展 --> VecDB[集成向量数据库]
-    集成扩展 --> EmbedInt[Embed组件集成]
-    集成扩展 --> EmbedSec[Embed安全模式]
-    集成扩展 --> EmbedSub[Embed子域部署]
+    集成扩展 --> EmbedInt[网页嵌入集成]
     集成扩展 --> Langfuse[Langfuse集成]
 
     安全认证 --> OIDC[OIDC认证调用流程]
@@ -148,8 +144,7 @@ graph TB
     FAQ -.-> DevGuide
     FAQ -.-> LogConfig
     FAQ -.-> Migrate
-    EmbedInt -.-> EmbedSec
-    EmbedSec -.-> EmbedSub
+    EmbedInt -.-> Langfuse
     Langfuse -.-> WorkerPool
     CloudImg -.-> TencentLH
     DevGuide -.-> OSImg
