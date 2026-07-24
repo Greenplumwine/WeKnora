@@ -1,12 +1,12 @@
 ---
 title: IM集成开发
-tags: [集成扩展, IM, 企微, 飞书, Lark, Slack, Telegram, 钉钉, Mattermost]
+tags: [集成扩展, IM, 企微, 飞书, Lark, Slack, Telegram, 钉钉, Mattermost, 个人微信, QQBot, 云之家]
 aliases: [IM集成, IM开发, 企业微信, 即时通讯]
 ---
 
 # IM 集成开发
 
-WeKnora 的 IM 集成模块将企业即时通讯平台（企业微信、飞书、Lark、Slack、Telegram、钉钉、Mattermost）接入 WeKnora 知识问答管道，支持在 IM 中直接向 AI 提问并获得实时流式回答。
+WeKnora 的 IM 集成模块将企业即时通讯平台（企业微信、飞书、Lark、Slack、Telegram、钉钉、Mattermost、个人微信、QQBot、云之家）接入 WeKnora 知识问答管道，支持在 IM 中直接向 AI 提问并获得实时流式回答。
 
 IM 渠道绑定到 Agent，一个 Agent 可接入多个 IM 渠道，所有配置通过前端 Agent 编辑器管理，存储在数据库中。
 
@@ -23,6 +23,9 @@ IM 渠道绑定到 Agent，一个 Agent 可接入多个 IM 渠道，所有配置
 | Telegram | ✅ (长轮询) | ✅ | ✅ |
 | 钉钉 | ✅ (Stream) | ✅ | ✅ (AI 卡片) |
 | Mattermost | - | ✅ | ✅ |
+| 个人微信 | ✅ (长轮询) | ✗ | ✗ |
+| QQBot | ✅ | ✗ | ✗ |
+| 云之家 | ✅ | ✅ | ✗ |
 
 ## 目录
 
