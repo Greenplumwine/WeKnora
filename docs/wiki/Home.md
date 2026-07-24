@@ -26,6 +26,7 @@ aliases: [Home, Index, wiki首页]
 | [MCP功能使用说明](核心功能/MCP功能使用说明.md) | MCP 服务的用户操作指南 |
 | [内置MCP服务管理](核心功能/内置MCP服务管理.md) | 内置 MCP 服务的系统级管理 |
 | [内置模型管理](核心功能/内置模型管理.md) | 内置模型的系统级管理 |
+| [内置智能体管理](核心功能/内置智能体管理.md) | 内置智能体的 YAML 配置与模型字段 |
 | [Agent技能系统](核心功能/Agent技能系统.md) | Agent Skills 扩展机制与预加载技能 |
 
 ## 集成与扩展
@@ -87,6 +88,7 @@ graph TB
     核心功能 --> MCP[MCP功能使用说明]
     核心功能 --> BuiltinMCP[内置MCP服务管理]
     核心功能 --> BuiltinModel[内置模型管理]
+    核心功能 --> BuiltinAgent[内置智能体管理]
     核心功能 --> Skills[Agent技能系统]
 
     集成扩展 --> IM[IM集成开发]
@@ -108,6 +110,7 @@ graph TB
     KG -.-> KGSetup
     MCP -.-> BuiltinMCP
     BuiltinMCP -.-> BuiltinModel
+    BuiltinModel -.-> BuiltinAgent
     Skills -.-> IM
     IM -.-> DS
     DS -.-> SharedSpace
