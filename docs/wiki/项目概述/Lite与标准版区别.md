@@ -2,7 +2,6 @@
 title: Lite与标准版区别
 tags: [项目概述, 部署, Lite]
 aliases: [Lite, LITE, 标准版区别]
-source: LITE.md
 ---
 
 # Lite 与标准版区别

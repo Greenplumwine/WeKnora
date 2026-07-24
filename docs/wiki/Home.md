@@ -23,7 +23,9 @@ aliases: [Home, Index, wiki首页]
 |------|------|
 | [知识图谱](核心功能/知识图谱.md) | Neo4j 知识图谱的快速开始与使用 |
 | [开启知识图谱功能](核心功能/开启知识图谱功能.md) | 知识图谱功能的完整启用流程 |
+| [文档分块策略](核心功能/文档分块策略.md) | 自适应三级分块策略与设置参考 |
 | [MCP功能使用说明](核心功能/MCP功能使用说明.md) | MCP 服务的用户操作指南 |
+| [MCP工具人工审核](核心功能/MCP工具人工审核.md) | MCP 危险工具的人工审核机制 |
 | [内置MCP服务管理](核心功能/内置MCP服务管理.md) | 内置 MCP 服务的系统级管理 |
 | [内置模型管理](核心功能/内置模型管理.md) | 内置模型的系统级管理 |
 | [内置智能体管理](核心功能/内置智能体管理.md) | 内置智能体的 YAML 配置与模型字段 |
@@ -37,6 +39,10 @@ aliases: [Home, Index, wiki首页]
 | [数据源导入开发](集成扩展/数据源导入开发.md) | 外部平台数据自动同步与导入 |
 | [添加网络搜索引擎](集成扩展/添加网络搜索引擎.md) | 扩展新的网络搜索 Provider |
 | [集成向量数据库](集成扩展/集成向量数据库.md) | 集成新的向量数据库检索引擎 |
+| [Embed组件集成](集成扩展/Embed组件集成.md) | 网站嵌入 WeKnora 智能体组件 |
+| [Embed安全模式](集成扩展/Embed安全模式.md) | 发布 Token 不落浏览器的安全模式 |
+| [Embed子域部署](集成扩展/Embed子域部署.md) | Embed 独立子域部署（可选） |
+| [Langfuse集成](集成扩展/Langfuse集成.md) | Langfuse 全链路可观测性追踪 |
 
 ## 安全与认证
 
@@ -52,18 +58,26 @@ aliases: [Home, Index, wiki首页]
 |------|------|
 | [开发指南](开发部署/开发指南.md) | 本地开发环境搭建与工作流 |
 | [快速开发模式](开发部署/快速开发模式.md) | 后端/前端热更新开发模式 |
+| [Worker池治理](开发部署/Worker池治理.md) | 后台任务分阶段 Worker 池与并发治理 |
+| [云镜像打包](开发部署/云镜像打包.md) | 可分发云镜像的制作与上架 |
+| [腾讯云轻量镜像](开发部署/腾讯云轻量镜像.md) | 腾讯云 Lighthouse/CVM 镜像制作 |
+| [OpenSearch集成测试](开发部署/OpenSearch集成测试.md) | OpenSearch k-NN 驱动本地集成测试 |
 
 ## 运维与排障
 
 | 页面 | 简介 |
 |------|------|
 | [常见问题](运维排障/常见问题.md) | 部署与使用中的 FAQ |
+| [日志配置](运维排障/日志配置.md) | 环境变量驱动的日志级别/格式/落盘 |
+| [迁移排障](运维排障/迁移排障.md) | 数据库迁移失败的诊断与恢复 |
 
 ## API 参考
 
 | 页面 | 简介 |
 |------|------|
 | [API文档概览](API参考/API文档概览.md) | RESTful API 基础信息与分类索引 |
+
+> 各 API 模块的详细说明见 [API文档概览](API参考/API文档概览.md) 中的分类表，包括 auth / knowledge / model / agent / session / chat / mcp-service / organization / vector-store 等 20 余个模块文档。
 
 ---
 
@@ -85,7 +99,9 @@ graph TB
 
     核心功能 --> KG[知识图谱]
     核心功能 --> KGSetup[开启知识图谱功能]
+    核心功能 --> Chunking[文档分块策略]
     核心功能 --> MCP[MCP功能使用说明]
+    核心功能 --> MCPApproval[MCP工具人工审核]
     核心功能 --> BuiltinMCP[内置MCP服务管理]
     核心功能 --> BuiltinModel[内置模型管理]
     核心功能 --> BuiltinAgent[内置智能体管理]
@@ -95,6 +111,10 @@ graph TB
     集成扩展 --> DS[数据源导入开发]
     集成扩展 --> WebSearch[添加网络搜索引擎]
     集成扩展 --> VecDB[集成向量数据库]
+    集成扩展 --> EmbedInt[Embed组件集成]
+    集成扩展 --> EmbedSec[Embed安全模式]
+    集成扩展 --> EmbedSub[Embed子域部署]
+    集成扩展 --> Langfuse[Langfuse集成]
 
     安全认证 --> OIDC[OIDC认证调用流程]
     安全认证 --> RBAC[空间RBAC说明]
@@ -102,13 +122,20 @@ graph TB
 
     开发部署 --> DevGuide[开发指南]
     开发部署 --> QuickDev[快速开发模式]
+    开发部署 --> WorkerPool[Worker池治理]
+    开发部署 --> CloudImg[云镜像打包]
+    开发部署 --> TencentLH[腾讯云轻量镜像]
+    开发部署 --> OSImg[OpenSearch集成测试]
 
     运维排障 --> FAQ[常见问题]
+    运维排障 --> LogConfig[日志配置]
+    运维排障 --> Migrate[迁移排障]
 
     API参考 --> APIOverview[API文档概览]
 
     KG -.-> KGSetup
     MCP -.-> BuiltinMCP
+    MCP -.-> MCPApproval
     BuiltinMCP -.-> BuiltinModel
     BuiltinModel -.-> BuiltinAgent
     Skills -.-> IM
@@ -121,6 +148,13 @@ graph TB
     WebSearch -.-> VecDB
     DevGuide -.-> QuickDev
     FAQ -.-> DevGuide
+    FAQ -.-> LogConfig
+    FAQ -.-> Migrate
+    EmbedInt -.-> EmbedSec
+    EmbedSec -.-> EmbedSub
+    Langfuse -.-> WorkerPool
+    CloudImg -.-> TencentLH
+    DevGuide -.-> OSImg
 ```
 
 ---

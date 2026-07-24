@@ -2,7 +2,6 @@
 title: MCP功能使用说明
 tags: [核心功能, MCP, 工具集成]
 aliases: [MCP使用, MCP功能]
-source: MCP功能使用说明.md
 ---
 
 # MCP 功能使用说明
