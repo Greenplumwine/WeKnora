@@ -53,7 +53,7 @@ mkdir my-new-skill/scripts
 
 ## 详细文档
 
-完整文档请参阅：[Agent Skills 文档](../../docs/agent-skills.md)
+完整文档请参阅：[Agent Skills 文档](../../docs/wiki/核心功能/Agent技能系统.md)
 
 ## 示例：pdf-processing
 

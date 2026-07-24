@@ -60,7 +60,7 @@
 - **v0.6.3** —— 网站嵌入 Widget 与发布集成中心（安全模式 Token 交换 + 限流）；对话体验全面革新（引用浮层、RAG 流水线进度、流式 Markdown）；文档多标签与批量重新解析；Wiki 文件夹与层级导航；RSS 数据源；MCP OAuth2；EPUB / MHTML 解析；Agent 模型就绪校验；模型调试器；会话来源筛选；工作区删除 UI。详见 [`CHANGELOG.md`](./CHANGELOG.md)。
 - **v0.6.2** —— 按批次解析配置（`process_config`）+ 上传确认对话框；文档重新解析（reparse）支持覆盖配置；`weknora` CLI v0.9（内置 Agent Skills、`session stop`、auth/profile 统一）；知识库框选多选；pgvector 1024 维 HNSW 索引；对话资源 Store 重构；仅保留 Langfuse 追踪（移除 Jaeger）。详见 [`CHANGELOG.md`](./CHANGELOG.md)。
 - **v0.6.1** —— 文档解析追踪时间线（Langfuse 风格 Span 树，逐阶段进度展示 + 解析中止）；OpenSearch 向量库驱动；YAML 声明式内置模型配置；系统管理员与统一平台设置 + 审计日志；新用户引导；设置页 UI 重构；`weknora` CLI v0.7 / v0.8（Agent 优先线协议、NDJSON、`--dry-run`）；OpenDataLoader 与 PaddleOCR-VL 解析引擎；MCP Server 多传输（stdio / SSE / HTTP）；按模型的思考模式配置；腾讯云 LKEAP 重排 + 原生 Gemini Embedding + MiniMax-M3。详见 [`CHANGELOG.md`](./CHANGELOG.md)。
-- **v0.6.0** —— 空间 RBAC（四级角色矩阵 `Owner` / `Admin` / `Contributor` / `Viewer` + 按 KB 归属 + 每空间审计日志）、空间成员管理与多工作区 UX、自助创建工作区；`weknora` CLI v0.4 正式版 + `mcp serve`；KB 检索跨向量库扇出；MCP / 数据源凭据 AES-256-GCM 加密 + docreader gRPC TLS + Token；新增智谱 Embedding 与华为云 OBS；服务端用户偏好；Go 1.26.0。详见 [`docs/RBAC说明.md`](./docs/RBAC说明.md) 与 [`CHANGELOG.md`](./CHANGELOG.md)。
+- **v0.6.0** —— 空间 RBAC（四级角色矩阵 `Owner` / `Admin` / `Contributor` / `Viewer` + 按 KB 归属 + 每空间审计日志）、空间成员管理与多工作区 UX、自助创建工作区；`weknora` CLI v0.4 正式版 + `mcp serve`；KB 检索跨向量库扇出；MCP / 数据源凭据 AES-256-GCM 加密 + docreader gRPC TLS + Token；新增智谱 Embedding 与华为云 OBS；服务端用户偏好；Go 1.26.0。详见 [`docs/wiki/安全认证/RBAC说明.md`](./docs/wiki/安全认证/RBAC说明.md) 与 [`CHANGELOG.md`](./CHANGELOG.md)。
 - **v0.5.2** —— Wiki 入库支撑万级文档知识库（任务队列 + 死信队列）；MCP 工具人机审批；Anthropic / Apache Doris / 腾讯云 VectorDB / 金山云 KS3 / SearXNG 后端；自适应三层分块 + 实时调试面板；全局 ⌘K 命令面板；语雀连接器 + 微信小程序；`weknora` CLI 早期版本。
 - **v0.5.1** —— 知识库批量管理；空间级 IM 频道总览；会话搜索 + 用户级置顶；模型 / 网页搜索 / MCP 统一卡片化设置；按 Agent LLM 调用超时；桌面端空间切换。
 - **v0.5.0** —— Wiki 模式正式版 —— Agent 从原始文档自治生成结构化、相互链接的 Markdown Wiki 页面及知识图谱；Wiki 浏览器 + 可视化图谱。
@@ -220,7 +220,7 @@ docker compose up -d   # 启动核心服务
 
 WeKnora 支持将文档转化为知识图谱，展示文档中不同段落之间的关联关系。开启知识图谱功能后，系统会分析并构建文档内部的语义关联网络，不仅帮助用户理解文档内容，还为索引和检索提供结构化支撑，提升检索结果的相关性和广度。
 
-具体配置请参考 [知识图谱配置说明](./docs/KnowledgeGraph.md) 进行相关配置。
+具体配置请参考 [知识图谱配置说明](./docs/wiki/核心功能/知识图谱.md) 进行相关配置。
 
 ## 配套MCP服务器
 
@@ -237,11 +237,11 @@ WeKnora 作为[微信对话开放平台](https://chatbot.weixin.qq.com)的核心
 
 ## 📘 文档
 
-常见问题排查：[常见问题排查](./docs/QA.md)
+常见问题排查：[常见问题排查](./docs/wiki/运维排障/常见问题.md)
 
-详细接口说明请参考：[API 文档](./docs/api/README.md)
+详细接口说明请参考：[API 文档](./docs/wiki/API参考/API文档概览.md)
 
-产品规划与计划：[路线图 (Roadmap)](./docs/ROADMAP.md)
+产品规划与计划：[路线图 (Roadmap)](./docs/wiki/项目概述/版本路线图.md)
 
 ## 🧭 开发指南
 
@@ -267,7 +267,7 @@ make dev-frontend
 - ✅ 无需重新构建 Docker 镜像
 - ✅ 支持 IDE 断点调试
 
-**详细文档：** [开发环境快速入门](./docs/开发指南.md)
+**详细文档：** [开发环境快速入门](./docs/wiki/开发部署/开发指南.md)
 
 
 ## 🤝 贡献指南

@@ -112,7 +112,7 @@ jobs:
           cp WeKnora-lite "${ARCHIVE}/"
           cp -r web/* "${ARCHIVE}/web/"
           cp .env.lite.example "${ARCHIVE}/"
-          cp docs/LITE.md "${ARCHIVE}/README.md"
+          cp docs/wiki/项目概述/Lite与标准版区别.md "${ARCHIVE}/README.md"
           if [ -d config ]; then
             cp -r config "${ARCHIVE}/config"
           fi
@@ -286,7 +286,7 @@ jobs:
           if [ -f .env.lite.example ]; then
             cp .env.lite.example "${ARCHIVE}/"
           fi
-          cp docs/LITE.md "${ARCHIVE}/README.md"
+          cp docs/wiki/项目概述/Lite与标准版区别.md "${ARCHIVE}/README.md"
           if [ -d config ]; then
             cp -r config "${ARCHIVE}/config"
           fi
@@ -398,7 +398,7 @@ jobs:
           | `WeKnora-Lite-App_*_linux_amd64.tar.gz` | Linux x86_64 |
           | `WeKnora-Lite-App_*_windows_amd64_setup.exe` | Windows x86_64 (安装包) |
 
-          详细文档见 [LITE.md](docs/LITE.md)。
+          详细文档见 [Lite与标准版区别](docs/wiki/项目概述/Lite与标准版区别.md)。
           NOTES
 
       - name: Create release

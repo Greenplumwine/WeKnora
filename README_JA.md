@@ -60,7 +60,7 @@ Feishu、Notion、Yuqueなどの外部プラットフォームからのナレッ
 - **v0.6.3** — ウェブサイト埋め込み Widget と統合センター（セキュアモード Token 交換 + レート制限）；チャット体験の全面刷新（引用ポップオーバー、RAG パイプライン進捗、ストリーミング Markdown）；ドキュメント複数タグと一括 reparse；Wiki フォルダーと階層ナビゲーション；RSS データソース；MCP OAuth2；EPUB / MHTML 解析；Agent モデル準備状態チェック；モデルデバッガー；セッションソースフィルター；ワークスペース削除 UI。詳細は [`CHANGELOG.md`](./CHANGELOG.md)。
 - **v0.6.2** — アップロード単位の解析設定（`process_config`）+ アップロード確認ダイアログ；reparse 時の設定上書き；`weknora` CLI v0.9（同梱 Agent Skills、`session stop`、auth/profile 統合）；KB マーキー複数選択；pgvector 1024 次元 HNSW インデックス；チャットリソース Store 刷新；Langfuse のみのトレーシング（Jaeger 削除）。詳細は [`CHANGELOG.md`](./CHANGELOG.md)。
 - **v0.6.1** — ドキュメント解析トレースタイムライン（Langfuse 風の Span ツリー、ステージごとの進捗表示 + 解析中止）；OpenSearch ベクター DB ドライバー；YAML 宣言型ビルトインモデル設定；システム管理者と統合プラットフォーム設定 + 監査ログ；新規ユーザーオンボーディングガイド；設定 UI 刷新；`weknora` CLI v0.7 / v0.8（Agent ファースト ワイヤープロトコル、NDJSON、`--dry-run`）；OpenDataLoader と PaddleOCR-VL 解析エンジン；MCP サーバーのマルチトランスポート（stdio / SSE / HTTP）；モデル単位の思考モード設定；Tencent LKEAP リランク + ネイティブ Gemini Embedding + MiniMax-M3。詳細は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
-- **v0.6.0** — テナント RBAC（4 階層ロールマトリクス `Owner` / `Admin` / `Contributor` / `Viewer` + KB 単位の所有 + テナントごとの監査ログ）、テナントメンバー管理とマルチワークスペース UX、セルフサービスでのワークスペース作成；`weknora` CLI v0.4 GA + `mcp serve`；KB 検索の複数ベクター DB ファンアウト；MCP / データソース資格情報の AES-256-GCM 暗号化 + docreader gRPC TLS + Token；Zhipu Embedder と華為雲 OBS の追加；サーバーサイドユーザー設定；Go 1.26.0。詳細は [`docs/RBAC说明.md`](./docs/RBAC说明.md) と [`CHANGELOG.md`](./CHANGELOG.md) を参照。
+- **v0.6.0** — テナント RBAC（4 階層ロールマトリクス `Owner` / `Admin` / `Contributor` / `Viewer` + KB 単位の所有 + テナントごとの監査ログ）、テナントメンバー管理とマルチワークスペース UX、セルフサービスでのワークスペース作成；`weknora` CLI v0.4 GA + `mcp serve`；KB 検索の複数ベクター DB ファンアウト；MCP / データソース資格情報の AES-256-GCM 暗号化 + docreader gRPC TLS + Token；Zhipu Embedder と華為雲 OBS の追加；サーバーサイドユーザー設定；Go 1.26.0。詳細は [`docs/wiki/安全认证/RBAC说明.md`](./docs/wiki/安全认证/RBAC说明.md) と [`CHANGELOG.md`](./CHANGELOG.md) を参照。
 - **v0.5.2** — Wiki インジェストが万件規模 KB に対応（タスクキュー + DLQ）；MCP 工具人機審批；Anthropic / Apache Doris / Tencent VectorDB / 金山雲 KS3 / SearXNG バックエンド；適応型 3 段階チャンキング + ライブプレビュー；グローバル ⌘K コマンドパレット；Yuque コネクタ + WeChat ミニプログラム；`weknora` CLI プレビュー版。
 - **v0.5.1** — KB 一括管理；テナント全体の IM チャネル概観；セッション検索 + ユーザー単位ピン留め；モデル / Web 検索 / MCP 統一カード設定；Agent ごとの LLM タイムアウト；デスクトップ版テナント切替。
 - **v0.5.0** — Wiki モード GA — Agent が原文書から構造化・相互リンクされた Markdown Wiki ページとナレッジグラフを自動生成、Wiki ブラウザと可視化グラフを UI に搭載。
@@ -213,7 +213,7 @@ docker compose up -d   # コアサービスを起動
 
 WeKnoraは文書をナレッジグラフに変換し、文書内の異なる段落間の関連関係を表示することをサポートします。ナレッジグラフ機能を有効にすると、システムは文書内部の意味関連ネットワークを分析・構築し、ユーザーが文書内容を理解するのを助けるだけでなく、インデックスと検索に構造化サポートを提供し、検索結果の関連性と幅を向上させます。
 
-詳細な設定については、[ナレッジグラフ設定ガイド](./docs/KnowledgeGraph.md)をご参照ください。
+詳細な設定については、[ナレッジグラフ設定ガイド](./docs/wiki/核心功能/知识图谱.md)をご参照ください。
 
 ## 対応するMCPサーバー  
 
@@ -231,11 +231,11 @@ WeKnoraは[WeChat対話オープンプラットフォーム](https://chatbot.wei
 
 ## 📘 ドキュメント
 
-よくある問題の解決：[よくある問題](./docs/QA.md)
+よくある問題の解決：[よくある問題](./docs/wiki/运维排障/常见问题.md)
 
-詳細なAPIドキュメントは：[APIドキュメント](./docs/api/README.md)を参照してください
+詳細なAPIドキュメントは：[APIドキュメント](./docs/wiki/API参考/API文档概览.md)を参照してください
 
-製品計画と今後の機能：[Roadmap](./docs/ROADMAP.md)
+製品計画と今後の機能：[Roadmap](./docs/wiki/项目概述/版本路线图.md)
 
 ## 🧭 開発ガイド
 
@@ -260,7 +260,7 @@ make dev-frontend
 - ✅ Dockerイメージを再構築する必要がない
 - ✅ IDEブレークポイントデバッグをサポート
 
-**詳細ドキュメント：** [開発環境クイックスタート](./docs/开发指南.md)
+**詳細ドキュメント：** [開発環境クイックスタート](./docs/wiki/开发部署/开发指南.md)
 
 ## 🤝 貢献ガイド
 

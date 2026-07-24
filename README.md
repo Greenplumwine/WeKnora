@@ -61,7 +61,7 @@ The framework supports auto-syncing knowledge from Feishu, Notion, and Yuque (mo
 - **v0.6.3** — Website embed widget & Integrations Center (secure-mode token exchange + rate limits); chat experience overhaul (citation popovers, RAG pipeline progress, streaming markdown); document multi-tag & batch reparse; Wiki folders & hierarchy navigation; RSS data source; MCP OAuth2; EPUB / MHTML parsing; agent model-readiness checks; model test debugger; session source filter; workspace deletion UI. See [`CHANGELOG.md`](./CHANGELOG.md).
 - **v0.6.2** — Per-upload process configuration with upload-confirm dialog; document reparse with `process_config`; `weknora` CLI v0.9 (bundled Agent Skills, `session stop`, auth/profile harmonization); KB marquee multi-select; HNSW index for 1024-dim pgvector embeddings; chat resources store refactor; Langfuse-only tracing (Jaeger removed). See [`CHANGELOG.md`](./CHANGELOG.md).
 - **v0.6.1** — Document parsing trace timeline (Langfuse-style span tree with stage-by-stage progress + stop-parse); OpenSearch vector store driver; declarative built-in models via YAML; system admin & consolidated platform settings + audit log; new-user onboarding guide; settings UI redesign; `weknora` CLI v0.7 / v0.8 (agent-first wire contract, NDJSON, `--dry-run`); OpenDataLoader + PaddleOCR-VL parsers; MCP server multi-transport (stdio / SSE / HTTP); per-model thinking-mode config; Tencent LKEAP rerank + native Gemini embeddings + MiniMax-M3. See [`CHANGELOG.md`](./CHANGELOG.md).
-- **v0.6.0** — Workspace RBAC (4-tier role matrix `Owner` / `Admin` / `Contributor` / `Viewer` + per-KB ownership + per-workspace audit log), workspace member management & multi-workspace UX, self-service workspaces; `weknora` CLI v0.4 GA with `mcp serve`; KB retrieval fan-out across vector stores; AES-256-GCM credential encryption + docreader gRPC TLS + Token; Zhipu embedder + Huawei OBS; server-side user preferences; Go 1.26.0. See [`docs/RBAC说明.md`](./docs/RBAC说明.md) and [`CHANGELOG.md`](./CHANGELOG.md).
+- **v0.6.0** — Workspace RBAC (4-tier role matrix `Owner` / `Admin` / `Contributor` / `Viewer` + per-KB ownership + per-workspace audit log), workspace member management & multi-workspace UX, self-service workspaces; `weknora` CLI v0.4 GA with `mcp serve`; KB retrieval fan-out across vector stores; AES-256-GCM credential encryption + docreader gRPC TLS + Token; Zhipu embedder + Huawei OBS; server-side user preferences; Go 1.26.0. See [`docs/wiki/安全认证/RBAC说明.md`](./docs/wiki/安全认证/RBAC说明.md) and [`CHANGELOG.md`](./CHANGELOG.md).
 - **v0.5.2** — Wiki ingest scales to 40k-document KBs (task queue + DLQ); MCP human-in-the-loop tool approval; Anthropic / Apache Doris / Tencent VectorDB / KS3 / SearXNG backends; adaptive 3-tier chunking with live preview; global ⌘K command palette; Yuque connector + WeChat Mini Program; `weknora` CLI preview.
 - **v0.5.1** — Knowledge-base batch management; workspace-wide IM channels overview; session search + user-scoped pinning; unified Model / Web Search / MCP settings cards; per-agent LLM timeout; desktop workspace switching.
 - **v0.5.0** — Wiki Mode GA — agents auto-generate structured, interlinked Markdown wiki pages with a knowledge graph; wiki browser + visual graph in the UI.
@@ -255,11 +255,11 @@ WeKnora serves as the core technology framework for the [WeChat Dialog Open Plat
 
 ## 📘 API Reference
 
-Troubleshooting FAQ: [Troubleshooting FAQ](./docs/QA.md)
+Troubleshooting FAQ: [Troubleshooting FAQ](./docs/wiki/运维排障/常见问题.md)
 
-Detailed API documentation is available at: [API Docs](./docs/api/README.md)
+Detailed API documentation is available at: [API Docs](./docs/wiki/API参考/API文档概览.md)
 
-Product plans and upcoming features: [Roadmap](./docs/ROADMAP.md)
+Product plans and upcoming features: [Roadmap](./docs/wiki/项目概述/版本路线图.md)
 
 ## 🧭 Developer Guide
 
@@ -284,7 +284,7 @@ make dev-frontend
 - ✅ No need to rebuild Docker images
 - ✅ Support IDE breakpoint debugging
 
-**Detailed Documentation:** [Development Environment Quick Start](./docs/开发指南.md)
+**Detailed Documentation:** [Development Environment Quick Start](./docs/wiki/开发部署/开发指南.md)
 
 
 ## 🤝 Contributing
