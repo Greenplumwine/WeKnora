@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Documentation
+
+- **DOC**: **文档结构统一迁入 wiki** - 将 `docs/` 下散落的顶层文档与子目录（`api/`、`cloud-image/`、`dev/`、`zh/`）统一并入 `docs/wiki/` 单层结构，消除「顶层全文 + wiki 摘要」的两层重复。内置模型管理、内置智能体管理文档补全（#2108）；新增文档分块策略、Embed 组件/安全模式/子域部署、Langfuse 集成、Worker 池治理、云镜像打包、OpenSearch 集成测试、MCP 工具人工审核、日志配置、迁移排障等 wiki 页面。`docs/` 根仅保留 swagger 产物（`docs.go` / `swagger.json` / `swagger.yaml`）与 `images/`。README×4、CI workflow、issue 模板、docker-compose、examples、scripts 中的文档引用已同步更新。历史条目中的旧路径引用保持原样。
+
 ## [0.7.0] - 2026-07-17
 
 ### New Features
