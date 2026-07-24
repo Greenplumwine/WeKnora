@@ -194,7 +194,7 @@ Skills 功能通过两个工具与 Agent 交互：
 
 ## 预加载技能（Preloaded Skills）
 
-系统内置了以下 5 个预加载技能，用于增强知识库问答和文档处理能力：
+系统内置了以下 5 个预加载技能，用于增强知识库问答、文档处理与课程生成能力：
 
 ### 1. citation-generator - 引用生成器
 
@@ -265,7 +265,22 @@ echo '[{"name": "A", "value": 1}]' | python scripts/format_converter.py --to csv
 
 **分析流程**：文档概览 -> 结构分析 -> 内容提取 -> 质量评估
 
-### 5. summary-generator - 内容摘要生成
+### 5. openmaic-classroom - OpenMAIC 互动课程生成
+
+**用途**：将 RAG 检索结果、文档块或知识图谱概念转换为 OpenMAIC 互动课程
+
+**触发场景**：用户要求将知识库内容、检索到的文档片段、上传的文档或知识图谱中的概念批量转换为教学课件 / 互动课堂
+
+**核心能力**：
+
+| 功能 | 说明 |
+|------|------|
+| RAG -> 课程 | 将知识检索结果提炼为教学需求（requirement），通过 OpenMAIC API 生成互动课程 |
+| PDF -> 课程 | 解析用户上传的 PDF，结合内容生成课程 |
+| 文档块 -> 课程集 | 将多个文档块/知识片段组织为多阶段课程集 |
+| 概念图遍历 -> 批量微课堂 | 遍历知识图谱中所有 concept 页面，每个 concept 生成一个 micro-classroom |
+
+> 该技能通过 WeKnora 注册的 `mcp_api_requester` MCP 工具调用 OpenMAIC API。
 
 预加载技能位于 `skills/preloaded/` 目录下：
 
@@ -283,7 +298,7 @@ skills/preloaded/
 │   └── SKILL.md
 ├── document-analyzer/
 │   └── SKILL.md
-└── summary-generator/
+└── openmaic-classroom/
     └── SKILL.md
 ```
 

@@ -4,40 +4,32 @@ tags: [开发部署, Worker, 任务队列, Asynq, 并发治理]
 aliases: [worker-pool-governance, WorkerPool, 任务池治理]
 ---
 
-# Worker Pool Governance
+# Worker 池治理
 
-WeKnora uses guaranteed per-stage worker pools plus an elastic pool for the
-document ingestion pipeline. Worker concurrency is a scheduling budget, not a
-replacement for model quotas, DocReader capacity, vector-store limits, or
-database connection limits.
+WeKnora 为文档摄入流水线采用按阶段保底的 worker 池加一个弹性池。Worker 并发是一种调度预算,并不能替代模型配额、DocReader 容量、向量存储限制或数据库连接限制。
 
 > 运行时队列面板与故障排查参见 [常见问题](../运维排障/常见问题.md) 第 30 条。
 
-## Topology
+## 拓扑
 
-| Pool | Default per instance | Queues | Purpose |
+| 池 | 每实例默认 | 队列 | 用途 |
 | --- | ---: | --- | --- |
-| Core | 8 | `default` | Document parsing and manual reparse guarantee |
-| Post-process | 2 | `postprocess` | Parse finalization and enrichment fan-out |
-| Enrichment | 12 | `summary`, `multimodal`, `graph`, `question` | Model-heavy enrichment guarantee |
-| Maintenance | 4 | `sync`, `low` | Source sync, batch work, move/delete/cleanup |
-| Shared | 6 | Core and enrichment queues | Elastic capacity borrowed by the side with backlog |
-| Wiki | 8 | `wiki` | Independently governed Wiki generation |
+| Core | 8 | `default`, `chat_attachment` | 文档解析与手工重解析保底,以及会话级聊天附件解析 |
+| Post-process | 2 | `postprocess` | 解析收尾与富化扇出 |
+| Enrichment | 12 | `summary`, `multimodal`, `graph`, `question` | 模型密集型富化保底 |
+| Maintenance | 4 | `sync`, `low` | 数据源同步、批处理、移动/删除/清理 |
+| Shared | 6 | Core 与 Enrichment 队列 | 由有积压的一侧借用的弹性容量 |
+| Wiki | 8 | `wiki` | 独立治理的 Wiki 生成 |
 
-The upstream total remains 32 workers per service instance by default. Wiki is
-separate and is not included in that total.
+上游总量默认仍为每服务实例 32 个 worker。Wiki 独立运行,不计入该总量。
 
-Post-process has its own physical queue so lightweight fan-out work cannot sit
-behind long DocReader calls. Maintenance is intentionally excluded from the
-shared pool because its long-running tasks could pin elastic capacity needed by
-the user-facing pipeline.
+Post-process 拥有独立的物理队列,这样轻量的扇出工作不会排在长时间的 DocReader 调用之后。Maintenance 被有意排除在共享池之外,因为其长时任务可能占住用户面流水线所需的弹性容量。
 
-Asynq dequeue is atomic. Dedicated and shared servers may safely subscribe to
-the same core/enrichment queues; one task is still processed by one worker.
+Asynq 出队是原子的。专用服务器与共享服务器可以安全订阅同一批 core/enrichment 队列;一个任务仍只由一个 worker 处理。
 
-## Configuration
+## 配置
 
-All settings are available under System settings and require a service restart:
+所有设置都位于「系统设置」下,且修改后需要重启服务:
 
 - `asynq.core_concurrency` / `WEKNORA_ASYNQ_CORE_CONCURRENCY`
 - `asynq.postprocess_concurrency` / `WEKNORA_ASYNQ_POSTPROCESS_CONCURRENCY`
@@ -46,51 +38,38 @@ All settings are available under System settings and require a service restart:
 - `asynq.shared_concurrency` / `WEKNORA_ASYNQ_SHARED_CONCURRENCY`
 - `asynq.wiki_concurrency` / `WEKNORA_WIKI_ASYNQ_CONCURRENCY`
 
-The old aggregate `asynq.concurrency` / `WEKNORA_ASYNQ_CONCURRENCY` setting is
-retired. Deployments that set it must migrate to the explicit pool settings.
-Persisted old rows are ignored and hidden from the System settings page so they
-cannot be mistaken for an effective runtime control.
+旧的聚合配置 `asynq.concurrency` / `WEKNORA_ASYNQ_CONCURRENCY` 已废弃。设置了该项的部署必须迁移到显式的分池配置。已持久化的旧行会被忽略,并从「系统设置」页面隐藏,以免被误当作有效的运行时控制。
 
-## Capacity layers
+## 容量层级
 
-Tune these layers independently:
+以下层级可独立调整:
 
-1. Worker concurrency controls the number of task handlers admitted per
-   service instance.
-2. Model quota governance controls provider concurrency, RPM, and TPM across
-   replicas and quota groups.
-3. DocReader, vector stores, object storage, Postgres, and local CPU/RAM retain
-   their own resource limits.
+1. Worker 并发控制每个服务实例准入的任务处理器数量。
+2. 模型配额治理控制跨副本和配额组的供应商并发、RPM 与 TPM。
+3. DocReader、向量存储、对象存储、Postgres 以及本地 CPU/RAM 保留各自的资源上限。
 
-If model limiter waiting grows while worker queues are busy, adding workers
-only creates more waiters. Increase the provider quota or reduce worker
-admission instead.
+若 worker 队列繁忙的同时模型限流器等待时长增长,仅增加 worker 只会产生更多等待者。此时应提升供应商配额,或减少 worker 准入。
 
-## Sizing
+## 容量规划
 
-For each pool, estimate peak required workers using:
+对每个池,使用下式估算峰值所需 worker:
 
 ```text
 required workers = ceil(peak task arrival rate * mean task runtime / 0.70)
 ```
 
-Use task arrival rate after fan-out. One parsed document can create one summary,
-multiple question batches, one graph task per chunk, and multiple image tasks.
-Queue count is not a capacity signal.
+使用扇出之后的任务到达率。一个已解析文档可能产生一次摘要、多个问题批次、每个 chunk 一个图谱任务,以及多个图片任务。队列数量并不是容量信号。
 
-The runtime dashboard reports:
+运行时面板上报:
 
-- configured concurrency per instance;
-- live server instance count;
-- cluster capacity aggregated from active asynq heartbeats;
-- active workers and utilization;
-- queue backlog, retries, dead letters, and oldest pending age;
-- model concurrency and limiter waiting.
+- 每实例已配置并发;
+- 存活的服务器实例数;
+- 由活动 asynq 心跳聚合得到的集群容量;
+- 活动 worker 数与利用率;
+- 队列积压、重试、死信以及最早待处理任务年龄;
+- 模型并发与限流器等待。
 
-Increase a pool only when backlog age grows while its downstream dependency has
-headroom. Reallocate to enrichment when core stays underutilized and fan-out
-queues grow. Reduce core admission when DocReader CPU, memory, or latency is the
-bottleneck.
+仅当某池的下游依赖尚有余量且其积压年龄增长时,才增加该池容量。当 core 长期未充分利用而扇出队列增长时,将容量重分配给 enrichment。当 DocReader 的 CPU、内存或延迟成为瓶颈时,降低 core 准入。
 
 ## 相关主题
 
