@@ -186,6 +186,20 @@
           </t-form-item>
         </template>
         <t-alert v-else theme="warning" class="compact-alert" :message="$t('settings.sandbox.localRuntimeWarning')" />
+        <div class="private-endpoint-row">
+          <div>
+            <p class="private-endpoint-row__title">{{ $t('settings.sandbox.allowNetwork') }}</p>
+            <p class="section-help">{{ $t('settings.sandbox.allowNetworkHint') }}</p>
+          </div>
+          <t-switch v-model="allowNetwork" />
+        </div>
+        <!--
+          Local processes run on the host and cannot be reliably network-isolated,
+          so a disabled switch does not mean "runs without network" — it means
+          "refuses to run". The admin has to see this before saving a broken config.
+        -->
+        <t-alert v-if="backend === 'local' && !allowNetwork" theme="warning" class="compact-alert"
+          :message="$t('settings.sandbox.localNetworkDisabledWarning')" />
       </section>
 
       <section v-if="currentStepKey === 'template'" class="setting-drawer__section">
@@ -453,6 +467,7 @@ const backend = ref('')
 // matching the HTTP timeout / TTL fields. A literal 0 would read as a real value.
 const defaultTimeoutSec = ref<number | undefined>(undefined)
 const allowPrivateEndpoints = ref(false)
+const allowNetwork = ref(false)
 const cube = reactive<SandboxCubeConfig>({})
 const e2b = reactive<SandboxE2BConfig>({})
 const docker = reactive<{ image?: string }>({})
@@ -597,6 +612,9 @@ function reset() {
     : defaultBackendType()
   defaultTimeoutSec.value = cfg.default_timeout_sec || undefined
   allowPrivateEndpoints.value = cfg.allow_private_endpoints === true
+  // Network toggle defaults per backend: docker isolates by default, local is
+  // networked by default (host process). An explicitly stored value wins.
+  allowNetwork.value = cfg.allow_network ?? (backend.value === 'local')
   // Replace rather than merge: a reused reactive object would otherwise carry
   // the previously edited config's fields into the next one opened.
   Object.keys(cube).forEach((key) => delete (cube as Record<string, unknown>)[key])
@@ -631,6 +649,9 @@ function selectBackend(value: string) {
   if (value === 'docker' && !docker.image) {
     docker.image = 'wechatopenai/weknora-sandbox:latest'
   }
+  // Re-evaluate the network toggle's per-backend default on switch so the
+  // switch reflects the new backend's isolation posture, not the old one's.
+  allowNetwork.value = value === 'local'
   onBackendChange()
 }
 
@@ -785,6 +806,11 @@ function collectPayload(): SandboxConfig {
     default_timeout_sec: defaultTimeoutSec.value || undefined,
     allow_private_endpoints: allowPrivateEndpoints.value || undefined,
     env_vars: envVars,
+  }
+  // allow_network only applies to docker/local; cube/e2b network is template-
+  // controlled, so omit it there to avoid a misleading stored value.
+  if (backend.value === 'docker' || backend.value === 'local') {
+    payload.allow_network = allowNetwork.value
   }
   // Send only the selected backend's block so an unused one cannot fail
   // validation (e.g. a stale private URL left in the other tab).

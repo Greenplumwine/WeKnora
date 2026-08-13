@@ -705,6 +705,8 @@ export interface SandboxConfig {
   sandbox_type?: string
   default_timeout_sec?: number
   allow_private_endpoints?: boolean
+  /** Controls outbound network access for docker/local backends. nil = backend default. */
+  allow_network?: boolean
   env_vars?: Record<string, string>
   volume_mount?: SandboxVolumeMountConfig
   cube?: SandboxCubeConfig

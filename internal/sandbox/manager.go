@@ -29,7 +29,7 @@ func NewManager(config *Config) (Manager, error) {
 
 	manager := &DefaultManager{
 		config:    config,
-		validator: NewScriptValidator(),
+		validator: NewScriptValidator(networkAllowed(config)),
 	}
 
 	// Initialize the appropriate sandbox
@@ -299,6 +299,14 @@ func NewDisabledManager() Manager {
 	return &DefaultManager{
 		config:    DefaultConfig(),
 		sandbox:   &disabledSandbox{},
-		validator: NewScriptValidator(),
+		validator: NewScriptValidator(false),
 	}
+}
+
+// networkAllowed reports whether the workspace config explicitly opted into
+// outbound network access. nil (unset) is false: the default stays isolated,
+// matching the historical behaviour where the validator's network-access
+// check ran unconditionally.
+func networkAllowed(cfg *Config) bool {
+	return cfg != nil && cfg.AllowNetwork != nil && *cfg.AllowNetwork
 }

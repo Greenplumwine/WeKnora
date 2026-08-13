@@ -141,8 +141,14 @@ func (s *DockerSandbox) buildDockerArgs(config *ExecuteConfig) []string {
 		args = append(args, "--cpus", fmt.Sprintf("%.2f", cpuLimit))
 	}
 
-	// Network isolation
-	if !config.AllowNetwork {
+	// Network isolation. The per-execution flag (ExecuteConfig.AllowNetwork)
+	// is honoured alongside the workspace config's opt-in: either can enable
+	// network. nil/unset keeps the docker default of isolated (--network none).
+	allowNetwork := config.AllowNetwork
+	if s.config.AllowNetwork != nil && *s.config.AllowNetwork {
+		allowNetwork = true
+	}
+	if !allowNetwork {
 		args = append(args, "--network", "none")
 	}
 

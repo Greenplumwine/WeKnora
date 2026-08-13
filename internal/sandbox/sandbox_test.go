@@ -316,3 +316,86 @@ print(f"Arguments: {sys.argv[1:]}")
 
 	t.Logf("Python script output: %s", result.Stdout)
 }
+
+// TestDockerSandboxBuildDockerArgs_NetworkIsolation verifies the --network none
+// flag is present unless network access is enabled at the config or per-exec
+// level.
+func TestDockerSandboxBuildDockerArgs_NetworkIsolation(t *testing.T) {
+	base := &ExecuteConfig{Script: "/tmp/x.py"}
+
+	// Default: nil AllowNetwork on both config and exec -> isolated.
+	s := NewDockerSandbox(DefaultConfig())
+	args := s.buildDockerArgs(base)
+	if !sliceContains(args, "--network", "none") {
+		t.Fatalf("default config should add --network none, got: %v", args)
+	}
+
+	// Config-level opt-in drops --network none.
+	allow := true
+	s2 := NewDockerSandbox(&Config{AllowNetwork: &allow, DockerImage: DefaultDockerImage})
+	args2 := s2.buildDockerArgs(base)
+	if sliceContains(args2, "--network", "none") {
+		t.Fatalf("config AllowNetwork=true should drop --network none, got: %v", args2)
+	}
+
+	// Per-exec opt-in also drops it even when config is nil.
+	s3 := NewDockerSandbox(DefaultConfig())
+	args3 := s3.buildDockerArgs(&ExecuteConfig{Script: "/tmp/x.py", AllowNetwork: true})
+	if sliceContains(args3, "--network", "none") {
+		t.Fatalf("per-exec AllowNetwork=true should drop --network none, got: %v", args3)
+	}
+
+	// Explicit config false keeps isolation.
+	deny := false
+	s4 := NewDockerSandbox(&Config{AllowNetwork: &deny, DockerImage: DefaultDockerImage})
+	args4 := s4.buildDockerArgs(base)
+	if !sliceContains(args4, "--network", "none") {
+		t.Fatalf("config AllowNetwork=false should keep --network none, got: %v", args4)
+	}
+}
+
+// TestLocalSandboxRefusesNetworkIsolation verifies that a local sandbox refuses
+// execution when the workspace config explicitly disables network access,
+// since host processes cannot be reliably network-isolated.
+func TestLocalSandboxRefusesNetworkIsolation(t *testing.T) {
+	deny := false
+	s := NewLocalSandbox(&Config{AllowNetwork: &deny})
+
+	_, err := s.Execute(context.Background(), &ExecuteConfig{Script: "/tmp/x.sh"})
+	if err != ErrLocalNetworkIsolationUnsupported {
+		t.Fatalf("expected ErrLocalNetworkIsolationUnsupported, got: %v", err)
+	}
+
+	// nil (unset) keeps the historical behaviour: no refusal at this gate.
+	sNil := NewLocalSandbox(DefaultConfig())
+	// Execution may fail for other reasons (script missing), but must not be
+	// the network-isolation refusal.
+	_, err = sNil.Execute(context.Background(), &ExecuteConfig{Script: "/nonexistent.sh"})
+	if err == ErrLocalNetworkIsolationUnsupported {
+		t.Fatalf("nil AllowNetwork should not refuse, got refusal")
+	}
+
+	// Explicit true: no refusal at this gate either.
+	allow := true
+	sAllow := NewLocalSandbox(&Config{AllowNetwork: &allow})
+	_, err = sAllow.Execute(context.Background(), &ExecuteConfig{Script: "/nonexistent.sh"})
+	if err == ErrLocalNetworkIsolationUnsupported {
+		t.Fatalf("AllowNetwork=true should not refuse, got refusal")
+	}
+}
+
+func sliceContains(args []string, target ...string) bool {
+	for i := 0; i+len(target) <= len(args); i++ {
+		match := true
+		for j, t := range target {
+			if args[i+j] != t {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
