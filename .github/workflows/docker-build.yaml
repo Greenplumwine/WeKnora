@@ -297,6 +297,15 @@ jobs:
           # 列出归档内容供核对:应只见 weknora-*.tar,不得出现 . 或目录条目。
           echo "归档内容核对:"
           tar tzf /tmp/out/weknora-docker-images.tar.gz
+          # 硬校验:归档里每一条都必须匹配 weknora-*.tar,否则直接失败,
+          # 绝不让任何其他内容(目录条目/软链接/无关文件)随归档上传。
+          bad="$(tar tzf /tmp/out/weknora-docker-images.tar.gz | grep -v '^weknora-[^/]*\.tar$' || true)"
+          if [ -n "$bad" ]; then
+            echo "归档含非 weknora-*.tar 条目,拒绝上传:" >&2
+            printf '%s\n' "$bad" >&2
+            exit 1
+          fi
+          echo "归档校验通过:仅含 weknora-*.tar"
 
       - name: Upload unified archive
         uses: actions/upload-artifact@v7
