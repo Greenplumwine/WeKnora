@@ -263,20 +263,40 @@ jobs:
 
       - name: Compress into single tar.gz (gzip -9, max level)
         run: |
+          set -euo pipefail
           mkdir -p /tmp/stage /tmp/out
-          # 只收 docker 镜像 tar,丢弃 download-artifact 可能夹带的其他文件。
-          find /tmp/images -type f -name '*.tar' -exec cp -t /tmp/stage {} +
+          # 严格白名单:只收 weknora-* 镜像 tar,丢弃任何其他文件。
+          # -type f 排除软链接;-maxdepth 1 不递归子目录(download-artifact
+          # merge-multiple 本应拍平,这里再加一层防御)。
+          find /tmp/images -maxdepth 1 -type f -name 'weknora-*.tar' \
+            -exec cp -t /tmp/stage {} +
           if [ -z "$(ls -A /tmp/stage 2>/dev/null)" ]; then
-            echo "没有找到任何 .tar 镜像文件" >&2
+            echo "没有找到任何 weknora-*.tar 镜像文件" >&2
+            exit 1
+          fi
+          # 防御:staging 区若出现任何软链接则拒绝打包,避免把指向 root 等
+          # 敏感路径的软链接写进归档(解包时会跟随/覆盖目标)。
+          if find /tmp/stage -maxdepth 1 -type l | grep -q .; then
+            echo "staging 区存在软链接,拒绝打包:" >&2
+            find /tmp/stage -maxdepth 1 -type l -ls >&2
             exit 1
           fi
           echo "打包以下镜像:"
           ls -lh /tmp/stage/
-          # docker save 的层是未压缩 tar,因此 gzip -9 对整体仍能有效压缩。
-          tar --use-compress-program="gzip -9" \
-              -cf /tmp/out/weknora-docker-images.tar.gz -C /tmp/stage .
+          # 关键:只归档 .tar 文件本身,绝不归档 "." 目录条目。
+          # 若用 "tar -C /tmp/stage ." 会把 staging 目录元数据(属主/权限/mtime,
+          # 来自 CI runner)写进归档,解包时 tar 会把这些元数据套到当前目录上,
+          # 上次 "root 目录权限变了" 就是这个 "." 条目导致的。这里用
+          # --files-from 只列文件名,从源头不产生 "." 条目。
+          find /tmp/stage -maxdepth 1 -type f -name 'weknora-*.tar' -printf '%f\0' \
+            | tar --null --files-from=- \
+                  --use-compress-program="gzip -9" \
+                  -cf /tmp/out/weknora-docker-images.tar.gz -C /tmp/stage
           echo "压缩完成:"
           ls -lh /tmp/out/weknora-docker-images.tar.gz
+          # 列出归档内容供核对:应只见 weknora-*.tar,不得出现 . 或目录条目。
+          echo "归档内容核对:"
+          tar tzf /tmp/out/weknora-docker-images.tar.gz
 
       - name: Upload unified archive
         uses: actions/upload-artifact@v7
