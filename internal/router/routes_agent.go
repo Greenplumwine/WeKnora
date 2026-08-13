@@ -73,7 +73,10 @@ func RegisterUserFavoriteRoutes(r *gin.RouterGroup, h *handler.UserResourceFavor
 // Viewer+. Future skill upload / enable endpoints must use Admin+ since
 // skills run sandboxed code on tenant resources.
 func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler, g *rbacGuards) {
-	skills := r.Group("/skills")
+	// Listing preloaded skills is read-only metadata. Any valid API key may
+	// call it (mirrors the Viewer+ floor JWT callers must clear); without the
+	// apiKeyGroup declaration the route is default-deny for X-API-Key.
+	skills := g.apiKeyGroup(r.Group("/skills"), apiKeyAny())
 	{
 		// List all preloaded skills — Viewer+
 		skills.GET("", g.Viewer(), skillHandler.ListSkills)
