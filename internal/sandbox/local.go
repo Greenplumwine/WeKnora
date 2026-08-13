@@ -49,6 +49,15 @@ func (s *LocalSandbox) Execute(ctx context.Context, config *ExecuteConfig) (*Exe
 		return nil, ErrInvalidScript
 	}
 
+	// Fail-safe: a workspace that explicitly disabled network access
+	// (allow_network=false) expects isolation, but local processes run on the
+	// host and cannot be reliably network-isolated without OS-level
+	// sandboxing. Refuse rather than silently allow egress. nil (unset) and
+	// true keep the historical local behaviour of running on the host.
+	if s.config.AllowNetwork != nil && !*s.config.AllowNetwork {
+		return nil, ErrLocalNetworkIsolationUnsupported
+	}
+
 	// Validate the script path
 	if err := s.validateScript(config.Script); err != nil {
 		return nil, err

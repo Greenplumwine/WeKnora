@@ -101,6 +101,12 @@ var (
 	ErrDangerousCommand  = errors.New("script contains dangerous command")
 	ErrArgInjection      = errors.New("argument injection detected")
 	ErrStdinInjection    = errors.New("stdin injection detected")
+
+	// ErrLocalNetworkIsolationUnsupported is returned when a local-process
+	// sandbox is asked to enforce network isolation (allow_network=false).
+	// Local processes run on the host and cannot be reliably network-isolated
+	// without OS-level sandboxing; rather than silently allow egress, refuse.
+	ErrLocalNetworkIsolationUnsupported = errors.New("sandbox: local backend cannot enforce network isolation; enable network access or use the docker backend")
 )
 
 // Sandbox defines the interface for isolated script execution
@@ -292,6 +298,16 @@ type Config struct {
 
 	// E2BHTTPTimeout bounds each HTTP call to the E2B API.
 	E2BHTTPTimeout time.Duration
+
+	// AllowNetwork controls outbound network access for scripts in this
+	// sandbox. nil (unset) preserves each backend's default: Docker isolated
+	// (--network none), Local networked but with the validator still blocking
+	// network-using scripts. true forces network on — Docker drops
+	// --network none and the validator skips its network-access check. false
+	// forces isolation; Local cannot enforce false and refuses execution
+	// (ErrLocalNetworkIsolationUnsupported). Cube/E2B network is template-
+	// controlled, so this only affects the validator there.
+	AllowNetwork *bool
 }
 
 // DefaultConfig returns a default sandbox configuration.

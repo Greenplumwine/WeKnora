@@ -5,7 +5,7 @@ import (
 )
 
 func TestScriptValidator_ValidateScript(t *testing.T) {
-	v := NewScriptValidator()
+	v := NewScriptValidator(false)
 
 	tests := []struct {
 		name       string
@@ -150,7 +150,7 @@ func TestScriptValidator_ValidateScript(t *testing.T) {
 }
 
 func TestScriptValidator_ValidateArgs(t *testing.T) {
-	v := NewScriptValidator()
+	v := NewScriptValidator(false)
 
 	tests := []struct {
 		name       string
@@ -248,7 +248,7 @@ func TestScriptValidator_ValidateArgs(t *testing.T) {
 }
 
 func TestScriptValidator_ValidateStdin(t *testing.T) {
-	v := NewScriptValidator()
+	v := NewScriptValidator(false)
 
 	tests := []struct {
 		name       string
@@ -293,7 +293,7 @@ func TestScriptValidator_ValidateStdin(t *testing.T) {
 }
 
 func TestScriptValidator_ValidateAll(t *testing.T) {
-	v := NewScriptValidator()
+	v := NewScriptValidator(false)
 
 	// Test comprehensive validation
 	result := v.ValidateAll(
@@ -361,10 +361,34 @@ func containsHelper(s, substr string) bool {
 }
 
 func BenchmarkValidateArgs(b *testing.B) {
-	v := NewScriptValidator()
+	v := NewScriptValidator(false)
 	args := []string{"--input", "file.txt", "--name", "report 2024", "--out", "/tmp/x", "--verbose", "--limit=50"}
 	b.ReportAllocs()
 	for b.Loop() {
 		_ = v.ValidateArgs(args)
+	}
+}
+
+// TestScriptValidator_AllowNetworkSkipsNetworkCheck verifies that a validator
+// built with allowNetwork=true does not reject scripts that merely use network
+// libraries — the workspace opted into network access, so the static
+// network-access check must step aside. Dangerous patterns still fire.
+func TestScriptValidator_AllowNetworkSkipsNetworkCheck(t *testing.T) {
+	networkScript := "import requests\nresp = requests.get('https://example.com')\nprint(resp.status_code)"
+
+	blocked := NewScriptValidator(false)
+	if r := blocked.ValidateScript(networkScript); r.Valid {
+		t.Fatalf("default validator should reject network script, got valid")
+	}
+
+	allowed := NewScriptValidator(true)
+	if r := allowed.ValidateScript(networkScript); !r.Valid {
+		t.Fatalf("allowNetwork validator should pass network script, got: %+v", r.Errors)
+	}
+
+	// Dangerous patterns must still fire even when network is allowed.
+	dangerous := "os.system('rm -rf /')"
+	if r := allowed.ValidateScript(dangerous); r.Valid {
+		t.Fatalf("allowNetwork validator must still reject dangerous patterns")
 	}
 }

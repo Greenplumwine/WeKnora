@@ -639,6 +639,16 @@ type TenantSandboxConfig struct {
 	// blocked. It is explicit in the UI instead of hidden in process env.
 	AllowPrivateEndpoints bool `json:"allow_private_endpoints,omitempty"`
 
+	// AllowNetwork controls outbound network access for scripts in this
+	// sandbox. nil (unset) preserves each backend's default (Docker isolated,
+	// Local networked-but-validator-blocks-network-scripts) so existing rows
+	// behave unchanged. true forces network on: the validator skips its
+	// network-access check and Docker drops --network none. false forces
+	// isolation; Local cannot enforce false and refuses execution instead of
+	// silently allowing egress. Cube/E2B network is template-controlled, so
+	// this only affects the validator there.
+	AllowNetwork *bool `json:"allow_network,omitempty"`
+
 	// EnvVars are additional environment variables injected into every
 	// sandbox created for this tenant. 🔒 Values are encrypted at rest.
 	// These become visible to all scripts running in the tenant's

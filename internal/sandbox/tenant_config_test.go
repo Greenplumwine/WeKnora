@@ -194,3 +194,41 @@ func TestEffectiveTemplateIDPerProvider(t *testing.T) {
 	require.Empty(t, EffectiveTemplateID(&Config{Type: SandboxTypeLocal}))
 	require.Empty(t, EffectiveTemplateID(nil))
 }
+
+// TestResolveEffectiveConfigPropagatesAllowNetwork verifies the cross-backend
+// allow_network policy threads through to the effective sandbox Config.
+func TestResolveEffectiveConfigPropagatesAllowNetwork(t *testing.T) {
+	global := globalTestConfig()
+
+	t.Run("nil stays nil (backend default)", func(t *testing.T) {
+		got, err := ResolveEffectiveConfig(&types.TenantSandboxConfig{
+			SandboxType: "docker",
+			Docker:      &types.DockerSandboxConfig{Image: "img"},
+		}, global)
+		require.NoError(t, err)
+		require.Nil(t, got.AllowNetwork)
+	})
+
+	t.Run("true propagates", func(t *testing.T) {
+		allow := true
+		got, err := ResolveEffectiveConfig(&types.TenantSandboxConfig{
+			SandboxType:  "docker",
+			Docker:       &types.DockerSandboxConfig{Image: "img"},
+			AllowNetwork: &allow,
+		}, global)
+		require.NoError(t, err)
+		require.NotNil(t, got.AllowNetwork)
+		require.True(t, *got.AllowNetwork)
+	})
+
+	t.Run("false propagates", func(t *testing.T) {
+		deny := false
+		got, err := ResolveEffectiveConfig(&types.TenantSandboxConfig{
+			SandboxType:  "local",
+			AllowNetwork: &deny,
+		}, global)
+		require.NoError(t, err)
+		require.NotNil(t, got.AllowNetwork)
+		require.False(t, *got.AllowNetwork)
+	})
+}
