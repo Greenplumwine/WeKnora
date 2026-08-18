@@ -289,9 +289,9 @@ jobs:
           # 上次 "root 目录权限变了" 就是这个 "." 条目导致的。这里用
           # --files-from 只列文件名,从源头不产生 "." 条目。
           find /tmp/stage -maxdepth 1 -type f -name 'weknora-*.tar' -printf '%f\0' \
-            | tar --null --files-from=- \
+            | tar -C /tmp/stage --null --files-from=- \
                   --use-compress-program="gzip -9" \
-                  -cf /tmp/out/weknora-docker-images.tar.gz -C /tmp/stage
+                  -cf /tmp/out/weknora-docker-images.tar.gz
           echo "压缩完成:"
           ls -lh /tmp/out/weknora-docker-images.tar.gz
           # 列出归档内容供核对:应只见 weknora-*.tar,不得出现 . 或目录条目。
