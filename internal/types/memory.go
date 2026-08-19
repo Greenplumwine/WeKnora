@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -64,11 +63,11 @@ const (
 )
 
 // Resident-block and recall budgets, in runes. Kept as budgets rather than
-// token counts because the block is rendered from short single-line items and
-// an exact token count would need a tokenizer on the read path.
+// token counts because the block is rendered from single-line items and an
+// exact token count would need a tokenizer on the read path.
 const (
-	MemoryBlockRuneBudget  = 900
-	MemoryRecallRuneBudget = 600
+	MemoryBlockRuneBudget  = 3000
+	MemoryRecallRuneBudget = 3000
 	// MemoryRecallMaxItems bounds how many situational items one turn can pull
 	// in, independent of the rune budget.
 	MemoryRecallMaxItems = 5
@@ -79,7 +78,7 @@ const (
 	// when the model asked for it and is answering a question the resident
 	// block could not.
 	MemorySearchMaxItems   = 20
-	MemorySearchRuneBudget = 2000
+	MemorySearchRuneBudget = 10000
 	// MemorySearchDefaultItems is what a caller that names no limit gets.
 	MemorySearchDefaultItems = 10
 	// MemoryResidentInterestMaxItems bounds how many interests the resident
@@ -92,10 +91,10 @@ const (
 	// not a place to list all of them, so the cap applies and relevance
 	// decides which ones survive it.
 	MemoryResidentInterestMaxItems = 5
-	// MemoryContentMaxRunes bounds a single stored memory. Memories are meant
-	// to be one sentence; anything longer is a summary that belongs in the
-	// chat history knowledge base instead.
-	MemoryContentMaxRunes = 300
+	// MemoryContentMaxRunes bounds a single stored memory. A memory may hold
+	// longer content such as a token JSON or a multi-line note, up to this
+	// budget; anything beyond it is truncated.
+	MemoryContentMaxRunes = 1500
 )
 
 // DefaultMemoryMaxItems bounds how many active items one subject may hold.
@@ -613,67 +612,6 @@ func NormalizeMemoryKey(key, content string) string {
 		result = string([]rune(result)[:200])
 	}
 	return result
-}
-
-// Patterns for material that must never become a long-term note. A memory is
-// injected into the system prompt of every later turn, so a credential that
-// lands here is not just retained, it is re-sent to a model repeatedly.
-//
-// The list is deliberately specific rather than clever. The previous attempt at
-// this feature matched loosely and mangled ordinary long order numbers while
-// still leaving the tail of an ID card in place, which is the worst of both
-// outcomes: the user loses correct memories and keeps the sensitive one.
-var sensitivePatterns = []*regexp.Regexp{
-	// Provider tokens, matched by their documented prefixes.
-	regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]{16,}`),
-	regexp.MustCompile(`\bsk_(live|test)_[A-Za-z0-9]{16,}`),
-	regexp.MustCompile(`\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}`),
-	regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}`),
-	regexp.MustCompile(`\b(AKIA|ASIA)[0-9A-Z]{16}`),
-	regexp.MustCompile(`\bxox[baprs]-[A-Za-z0-9\-]{10,}`),
-	regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}`),
-	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),
-	// A value assigned to something that names itself a secret.
-	// The value stops at whitespace or CJK punctuation: Chinese has no spaces,
-	// so a greedy \S+ would swallow the rest of the sentence and redact a whole
-	// legitimate memory along with the secret.
-	regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_\- ]?key|access[_\- ]?key)\b` +
-		`\s*[:=＝：]\s*[^\s，。、；：！？,;]+`),
-	// No \b here: Go's word boundary is ASCII-only, so it never matches before
-	// a CJK character and would silently disable this rule.
-	regexp.MustCompile(`(密码|口令|密钥|秘钥)\s*[:=＝：是为]?\s*[^\s，。、；：！？,;]+`),
-	// Mainland China resident ID: anchored on a plausible birth date so long
-	// order numbers and other 18-digit strings are not caught.
-	regexp.MustCompile(`\b[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b`),
-	// Bank card numbers, optionally spaced or dashed into groups.
-	regexp.MustCompile(`\b\d{4}[ \-]?\d{4}[ \-]?\d{4}[ \-]?\d{2,7}\b`),
-	// Mainland China mobile numbers.
-	regexp.MustCompile(`\b1[3-9]\d{9}\b`),
-	// Long opaque high-entropy strings: what an unrecognised token looks like.
-	regexp.MustCompile(`\b[A-Za-z0-9_\-]{40,}\b`),
-}
-
-// RedactedMemoryPlaceholder replaces removed material. It is visible on purpose:
-// a user reading their memory list should be able to tell that something was
-// dropped rather than silently mangled.
-const RedactedMemoryPlaceholder = "【已隐藏】"
-
-// RedactSensitive removes credentials and identity numbers from a statement.
-// The second return value reports whether anything was removed.
-func RedactSensitive(content string) (string, bool) {
-	redacted := content
-	for _, pattern := range sensitivePatterns {
-		redacted = pattern.ReplaceAllString(redacted, RedactedMemoryPlaceholder)
-	}
-	return redacted, redacted != content
-}
-
-// IsMostlyRedacted reports whether a statement lost so much that keeping it
-// would store a placeholder rather than a memory.
-func IsMostlyRedacted(content string) bool {
-	stripped := strings.ReplaceAll(content, RedactedMemoryPlaceholder, "")
-	remaining := len([]rune(strings.TrimSpace(stripped)))
-	return remaining < 6
 }
 
 // NormalizeMemoryForMatch collapses a statement to a comparable form: no case,
