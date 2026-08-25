@@ -39,5 +39,13 @@ if [ -d "$BUILTIN_DIR" ]; then
     chown -R appuser:appuser "$PRELOADED_DIR"
 fi
 
+# ─── Allow appuser to reach the host docker daemon when mounted ───
+# appuser is dropped via gosu and group_add is lost on setgroups, so the
+# socket's 0660 mode blocks it. chown here (root stage) lets appuser read
+# the mounted host docker.sock so the Docker sandbox backend can connect.
+if [ -S /var/run/docker.sock ]; then
+    chown appuser:appuser /var/run/docker.sock 2>/dev/null || true
+fi
+
 # ─── Drop privileges and exec the main process ───
 exec gosu appuser "$@"
