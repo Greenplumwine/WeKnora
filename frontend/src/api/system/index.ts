@@ -761,6 +761,10 @@ export interface SandboxConfig {
   sandbox_type?: string
   default_timeout_sec?: number
   allow_private_endpoints?: boolean
+  /** Controls whether scripts using network libraries (requests, http.client, etc.)
+   * pass the static pre-execution check. Docker container egress is still
+   * governed by docker.network_mode. Only meaningful for docker/local backends. */
+  allow_network?: boolean
   env_vars?: Record<string, string>
   volume_mount?: SandboxVolumeMountConfig
   skill_image?: SandboxSkillImage

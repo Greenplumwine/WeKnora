@@ -230,6 +230,11 @@ type Config struct {
 	// connection. Link-local addresses are blocked regardless.
 	AllowPrivateEndpoints bool
 
+	// AllowNetwork lifts the static network-access content check for scripts
+	// when the workspace opted in (true). nil/false keeps the check enforced.
+	// It does not control container egress — that is DockerNetworkMode's job.
+	AllowNetwork *bool
+
 	// DockerImage is the image every sandbox container is created from. It
 	// plays the same role as a Cube/E2B template ID.
 	DockerImage string

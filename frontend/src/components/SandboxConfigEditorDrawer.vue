@@ -206,6 +206,13 @@
           </t-form-item>
         </template>
         <t-alert v-else theme="warning" class="compact-alert" :message="$t('settings.sandbox.localRuntimeWarning')" />
+        <div class="private-endpoint-row">
+          <div>
+            <p class="private-endpoint-row__title">{{ $t('settings.sandbox.allowNetwork') }}</p>
+            <p class="section-help">{{ $t('settings.sandbox.allowNetworkHint') }}</p>
+          </div>
+          <t-switch v-model="allowNetwork" />
+        </div>
       </section>
 
       <section v-if="currentStepKey === 'template'" class="setting-drawer__section">
@@ -522,6 +529,7 @@ const backend = ref('')
 // matching the HTTP timeout / TTL fields. A literal 0 would read as a real value.
 const defaultTimeoutSec = ref<number | undefined>(undefined)
 const allowPrivateEndpoints = ref(false)
+const allowNetwork = ref(false)
 const cube = reactive<SandboxCubeConfig>({})
 const e2b = reactive<SandboxE2BConfig>({})
 const docker = reactive<SandboxDockerConfig>({})
@@ -711,6 +719,7 @@ function reset() {
     : defaultBackendType()
   defaultTimeoutSec.value = cfg.default_timeout_sec || undefined
   allowPrivateEndpoints.value = cfg.allow_private_endpoints === true
+  allowNetwork.value = cfg.allow_network === true
   // Replace rather than merge: a reused reactive object would otherwise carry
   // the previously edited config's fields into the next one opened.
   Object.keys(cube).forEach((key) => delete (cube as Record<string, unknown>)[key])
@@ -907,6 +916,12 @@ function collectPayload(): SandboxConfig {
     allow_private_endpoints: allowPrivateEndpoints.value || undefined,
     env_vars: envVars,
     skill_rollout: effectiveRecord.value?.config?.skill_rollout,
+  }
+  // The static network check guards only the docker and local backends;
+  // remote templates control egress themselves, so the flag is only sent
+  // for the two backends it can affect.
+  if (backend.value === 'docker' || backend.value === 'local') {
+    payload.allow_network = allowNetwork.value || undefined
   }
   // Send only the selected backend's block so an unused one cannot fail
   // validation (e.g. a stale private URL left in the other tab).

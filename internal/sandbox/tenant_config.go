@@ -59,6 +59,7 @@ func ResolveEffectiveConfig(
 	}
 	overrideSeconds(&effective.DefaultTimeout, tenantCfg.DefaultTimeoutSec)
 	effective.AllowPrivateEndpoints = tenantCfg.AllowPrivateEndpoints
+	effective.AllowNetwork = tenantCfg.AllowNetwork
 	if tenantCfg.EnvVars != nil {
 		effective.EnvVars = cloneMetadata(tenantCfg.EnvVars)
 	}

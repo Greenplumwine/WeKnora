@@ -8,6 +8,12 @@ import (
 
 // ScriptValidator validates scripts and arguments for security
 type ScriptValidator struct {
+	// allowNetwork, when true, skips the static network-access content check.
+	// It is set from the sandbox config's AllowNetwork policy: a workspace
+	// that opted into network access may run scripts that use network
+	// libraries. Dangerous-command, dangerous-pattern and reverse-shell checks
+	// run regardless of this flag.
+	allowNetwork bool
 	// DangerousCommands are shell commands that should never be executed
 	dangerousCommands []string
 	// DangerousPatterns are regex patterns that indicate dangerous operations
@@ -35,9 +41,14 @@ type ValidationResult struct {
 	Errors []*ValidationError
 }
 
-// NewScriptValidator creates a new validator with default security rules
-func NewScriptValidator() *ScriptValidator {
+// NewScriptValidator creates a new validator with default security rules.
+// allowNetwork controls whether the static network-access content check is
+// enforced: a workspace that opted into network access passes true so its
+// network-using scripts are not rejected at validation time. The dangerous-
+// command, dangerous-pattern and reverse-shell checks run regardless.
+func NewScriptValidator(allowNetwork bool) *ScriptValidator {
 	v := &ScriptValidator{
+		allowNetwork:      allowNetwork,
 		dangerousCommands: getDefaultDangerousCommands(),
 	}
 	v.dangerousPatterns = compilePatterns(getDefaultDangerousPatterns())
@@ -76,8 +87,12 @@ func (v *ScriptValidator) ValidateScript(content string) *ValidationResult {
 		}
 	}
 
-	// Check for network access attempts
-	if v.hasNetworkAccess(content) {
+	// Check for network access attempts. Skipped when the workspace config
+	// opted into network access: the admin consented, and blocking the script
+	// at validation time would defeat the purpose of the toggle. This guard
+	// does not affect dangerous-command, dangerous-pattern or reverse-shell
+	// checks, which run unconditionally below.
+	if !v.allowNetwork && v.hasNetworkAccess(content) {
 		result.Valid = false
 		result.Errors = append(result.Errors, &ValidationError{
 			Type:    "network_access",

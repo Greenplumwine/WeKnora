@@ -29,7 +29,7 @@ func NewManager(config *Config) (Manager, error) {
 
 	manager := &DefaultManager{
 		config:    config,
-		validator: NewScriptValidator(),
+		validator: NewScriptValidator(config.AllowNetwork != nil && *config.AllowNetwork),
 	}
 
 	// Initialize the appropriate sandbox
@@ -285,6 +285,6 @@ func NewDisabledManager() Manager {
 	return &DefaultManager{
 		config:    DefaultConfig(),
 		sandbox:   &disabledSandbox{},
-		validator: NewScriptValidator(),
+		validator: NewScriptValidator(false),
 	}
 }

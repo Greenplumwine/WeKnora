@@ -641,6 +641,13 @@ type TenantSandboxConfig struct {
 	// blocked. It is explicit in the UI instead of hidden in process env.
 	AllowPrivateEndpoints bool `json:"allow_private_endpoints,omitempty"`
 
+	// AllowNetwork controls whether scripts using network libraries (requests,
+	// http.client, etc.) may run. nil means the static network-access check
+	// stays enforced; true opts out of it so network-using scripts pass
+	// pre-execution validation. Docker container egress is still governed by
+	// DockerNetworkMode; this only lifts the content check.
+	AllowNetwork *bool `json:"allow_network,omitempty"`
+
 	// EnvVars are additional environment variables injected into every
 	// sandbox created for this tenant. 🔒 Values are encrypted at rest.
 	// These become visible to all scripts running in the tenant's

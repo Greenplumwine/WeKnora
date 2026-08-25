@@ -1178,6 +1178,8 @@ export default {
       },
       allowPrivateEndpoints: 'Allow private cluster endpoints',
       allowPrivateEndpointsHint: 'Use for self-hosted private control planes. Link-local and cloud metadata addresses remain blocked.',
+      allowNetwork: 'Allow scripts to access the network',
+      allowNetworkHint: 'Skips the static check for network libraries (requests, http.client, etc.) in scripts. Docker container egress is still governed by the network mode.',
       howToBuildTemplate: 'Sandbox cluster setup and template guide',
       noEnvVars: 'No additional environment variables. Add only values required by skills.',
       fieldRequired: 'Required',

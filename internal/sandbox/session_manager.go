@@ -194,7 +194,7 @@ func NewSessionBoundManager(deps SessionBoundManagerConfig) (*SessionBoundManage
 
 	m := &SessionBoundManager{
 		config:     cfg,
-		validator:  NewScriptValidator(),
+		validator:  NewScriptValidator(cfg.AllowNetwork != nil && *cfg.AllowNetwork),
 		client:     deps.Client,
 		bindings:   deps.Store,
 		checker:    deps.Checker,

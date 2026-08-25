@@ -5019,6 +5019,8 @@ export default {
       },
       allowPrivateEndpoints: '允许访问私网集群地址',
       allowPrivateEndpointsHint: '仅用于自建 Cube 等私网控制面；云元数据等链路本地地址始终禁止访问。',
+      allowNetwork: '允许脚本访问网络',
+      allowNetworkHint: '开启后跳过脚本网络库（requests、http.client 等）的静态检查；Docker 容器出网仍由网络模式控制。',
       howToBuildTemplate: '沙箱集群搭建与模板说明',
       noEnvVars: '暂无额外环境变量，仅添加技能确实需要的值。',
       fieldRequired: '必填',
