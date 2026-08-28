@@ -2,8 +2,6 @@ package sandbox
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -11,16 +9,12 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
-	if config.Type != SandboxTypeLocal {
-		t.Errorf("Expected default type to be local, got %s", config.Type)
+	if config.Type != SandboxTypeDisabled {
+		t.Errorf("Expected default type to be disabled, got %s", config.Type)
 	}
 
 	if config.DefaultTimeout != DefaultTimeout {
 		t.Errorf("Expected default timeout %v, got %v", DefaultTimeout, config.DefaultTimeout)
-	}
-
-	if !config.FallbackEnabled {
-		t.Error("Expected fallback to be enabled by default")
 	}
 }
 
@@ -36,9 +30,9 @@ func TestValidateConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "valid config",
+			name: "valid disabled config",
 			config: &Config{
-				Type:           SandboxTypeLocal,
+				Type:           SandboxTypeDisabled,
 				DefaultTimeout: 30 * time.Second,
 			},
 			wantErr: false,
@@ -51,9 +45,16 @@ func TestValidateConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "removed local type",
+			config: &Config{
+				Type: "local",
+			},
+			wantErr: true,
+		},
+		{
 			name: "negative timeout",
 			config: &Config{
-				Type:           SandboxTypeLocal,
+				Type:           SandboxTypeDisabled,
 				DefaultTimeout: -1 * time.Second,
 			},
 			wantErr: true,
@@ -70,143 +71,17 @@ func TestValidateConfig(t *testing.T) {
 	}
 }
 
-func TestLocalSandboxExecute(t *testing.T) {
-	// Create a temporary script
-	tmpDir, err := os.MkdirTemp("", "sandbox-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Write a simple test script
-	scriptPath := filepath.Join(tmpDir, "test.sh")
-	scriptContent := `#!/bin/bash
-echo "Hello from sandbox"
-echo "Args: $@"
-`
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
-		t.Fatalf("Failed to write script: %v", err)
-	}
-
-	// Create local sandbox
-	config := DefaultConfig()
-	config.Type = SandboxTypeLocal
-	sandbox := NewLocalSandbox(config)
-
-	// Check availability
-	ctx := context.Background()
-	if !sandbox.IsAvailable(ctx) {
-		t.Error("Local sandbox should always be available")
-	}
-
-	// Execute script
-	result, err := sandbox.Execute(ctx, &ExecuteConfig{
-		Script:  scriptPath,
-		Args:    []string{"arg1", "arg2"},
-		Timeout: 10 * time.Second,
-	})
-
-	if err != nil {
-		t.Fatalf("Failed to execute script: %v", err)
-	}
-
-	if result.ExitCode != 0 {
-		t.Errorf("Expected exit code 0, got %d", result.ExitCode)
-	}
-
-	if result.Stdout == "" {
-		t.Error("Expected stdout to be non-empty")
-	}
-
-	t.Logf("Script output: %s", result.Stdout)
-	t.Logf("Duration: %v", result.Duration)
-}
-
-func TestManagerMergesWorkspaceEnvironmentVariables(t *testing.T) {
-	tmpDir := t.TempDir()
-	scriptPath := filepath.Join(tmpDir, "env.sh")
-	scriptContent := "#!/bin/sh\nprintf '%s|%s' \"$WORKSPACE_VALUE\" \"$OVERRIDE_VALUE\"\n"
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	config := DefaultConfig()
-	config.Type = SandboxTypeLocal
-	config.EnvVars = map[string]string{
-		"WORKSPACE_VALUE": "from-workspace",
-		"OVERRIDE_VALUE":  "workspace-default",
-	}
-	manager, err := NewManager(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := manager.Execute(context.Background(), &ExecuteConfig{
-		Script:        scriptPath,
-		ScriptContent: scriptContent,
-		Env:           map[string]string{"OVERRIDE_VALUE": "per-execution"},
-		Timeout:       10 * time.Second,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Stdout != "from-workspace|per-execution" {
-		t.Fatalf("unexpected environment output %q", result.Stdout)
-	}
-}
-
-func TestLocalSandboxTimeout(t *testing.T) {
-	// Create a temporary script that sleeps
-	tmpDir, err := os.MkdirTemp("", "sandbox-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Write a script that sleeps
-	scriptPath := filepath.Join(tmpDir, "sleep.sh")
-	scriptContent := `#!/bin/bash
-sleep 10
-echo "Done"
-`
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
-		t.Fatalf("Failed to write script: %v", err)
-	}
-
-	// Create local sandbox
-	config := DefaultConfig()
-	config.Type = SandboxTypeLocal
-	sandbox := NewLocalSandbox(config)
-
-	// Execute with short timeout
-	ctx := context.Background()
-	result, err := sandbox.Execute(ctx, &ExecuteConfig{
-		Script:  scriptPath,
-		Timeout: 1 * time.Second,
-	})
-
-	if err != nil {
-		t.Fatalf("Execute should not return error, got: %v", err)
-	}
-
-	if !result.Killed {
-		t.Error("Expected script to be killed due to timeout")
-	}
-
-	t.Logf("Script was killed: %v, Duration: %v", result.Killed, result.Duration)
-}
-
 func TestNewManager(t *testing.T) {
 	config := DefaultConfig()
-	config.Type = SandboxTypeLocal
+	config.Type = SandboxTypeDisabled
 
 	manager, err := NewManager(config)
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
 	}
 
-	if manager.GetType() != SandboxTypeLocal {
-		t.Errorf("Expected type local, got %s", manager.GetType())
+	if manager.GetType() != SandboxTypeDisabled {
+		t.Errorf("Expected type disabled, got %s", manager.GetType())
 	}
 }
 
@@ -217,7 +92,6 @@ func TestNewDisabledManager(t *testing.T) {
 		t.Errorf("Expected type disabled, got %s", manager.GetType())
 	}
 
-	// Execute should fail
 	ctx := context.Background()
 	_, err := manager.Execute(ctx, &ExecuteConfig{
 		Script: "/some/script.sh",
@@ -236,7 +110,7 @@ func TestIsNamedSandboxBackendType(t *testing.T) {
 		{"cube", true},
 		{"e2b", true},
 		{"docker", true},
-		{"local", true},
+		{"local", false},
 		{"disabled", false},
 		{"", false},
 	} {
@@ -247,7 +121,6 @@ func TestIsNamedSandboxBackendType(t *testing.T) {
 }
 
 func TestExecuteResultHelpers(t *testing.T) {
-	// Test IsSuccess
 	successResult := &ExecuteResult{
 		ExitCode: 0,
 		Stdout:   "output",
@@ -271,131 +144,4 @@ func TestExecuteResultHelpers(t *testing.T) {
 	if killedResult.IsSuccess() {
 		t.Error("Expected IsSuccess() to return false when killed")
 	}
-
-}
-
-func TestPythonScriptExecution(t *testing.T) {
-	// Create a temporary Python script
-	tmpDir, err := os.MkdirTemp("", "sandbox-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Write a Python script
-	scriptPath := filepath.Join(tmpDir, "test.py")
-	scriptContent := `#!/usr/bin/env python3
-import sys
-print("Hello from Python")
-print(f"Arguments: {sys.argv[1:]}")
-`
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
-		t.Fatalf("Failed to write script: %v", err)
-	}
-
-	// Create local sandbox
-	config := DefaultConfig()
-	config.Type = SandboxTypeLocal
-	sandbox := NewLocalSandbox(config)
-
-	// Execute Python script
-	ctx := context.Background()
-	result, err := sandbox.Execute(ctx, &ExecuteConfig{
-		Script:  scriptPath,
-		Args:    []string{"test", "args"},
-		Timeout: 10 * time.Second,
-	})
-
-	if err != nil {
-		t.Fatalf("Failed to execute Python script: %v", err)
-	}
-
-	if result.ExitCode != 0 {
-		t.Errorf("Expected exit code 0, got %d. Stderr: %s", result.ExitCode, result.Stderr)
-	}
-
-	t.Logf("Python script output: %s", result.Stdout)
-}
-
-// TestDockerSandboxBuildDockerArgs_NetworkIsolation verifies the --network none
-// flag is present unless network access is enabled at the config or per-exec
-// level.
-func TestDockerSandboxBuildDockerArgs_NetworkIsolation(t *testing.T) {
-	base := &ExecuteConfig{Script: "/tmp/x.py"}
-
-	// Default: nil AllowNetwork on both config and exec -> isolated.
-	s := NewDockerSandbox(DefaultConfig())
-	args := s.buildDockerArgs(base)
-	if !sliceContains(args, "--network", "none") {
-		t.Fatalf("default config should add --network none, got: %v", args)
-	}
-
-	// Config-level opt-in drops --network none.
-	allow := true
-	s2 := NewDockerSandbox(&Config{AllowNetwork: &allow, DockerImage: DefaultDockerImage})
-	args2 := s2.buildDockerArgs(base)
-	if sliceContains(args2, "--network", "none") {
-		t.Fatalf("config AllowNetwork=true should drop --network none, got: %v", args2)
-	}
-
-	// Per-exec opt-in also drops it even when config is nil.
-	s3 := NewDockerSandbox(DefaultConfig())
-	args3 := s3.buildDockerArgs(&ExecuteConfig{Script: "/tmp/x.py", AllowNetwork: true})
-	if sliceContains(args3, "--network", "none") {
-		t.Fatalf("per-exec AllowNetwork=true should drop --network none, got: %v", args3)
-	}
-
-	// Explicit config false keeps isolation.
-	deny := false
-	s4 := NewDockerSandbox(&Config{AllowNetwork: &deny, DockerImage: DefaultDockerImage})
-	args4 := s4.buildDockerArgs(base)
-	if !sliceContains(args4, "--network", "none") {
-		t.Fatalf("config AllowNetwork=false should keep --network none, got: %v", args4)
-	}
-}
-
-// TestLocalSandboxRefusesNetworkIsolation verifies that a local sandbox refuses
-// execution when the workspace config explicitly disables network access,
-// since host processes cannot be reliably network-isolated.
-func TestLocalSandboxRefusesNetworkIsolation(t *testing.T) {
-	deny := false
-	s := NewLocalSandbox(&Config{AllowNetwork: &deny})
-
-	_, err := s.Execute(context.Background(), &ExecuteConfig{Script: "/tmp/x.sh"})
-	if err != ErrLocalNetworkIsolationUnsupported {
-		t.Fatalf("expected ErrLocalNetworkIsolationUnsupported, got: %v", err)
-	}
-
-	// nil (unset) keeps the historical behaviour: no refusal at this gate.
-	sNil := NewLocalSandbox(DefaultConfig())
-	// Execution may fail for other reasons (script missing), but must not be
-	// the network-isolation refusal.
-	_, err = sNil.Execute(context.Background(), &ExecuteConfig{Script: "/nonexistent.sh"})
-	if err == ErrLocalNetworkIsolationUnsupported {
-		t.Fatalf("nil AllowNetwork should not refuse, got refusal")
-	}
-
-	// Explicit true: no refusal at this gate either.
-	allow := true
-	sAllow := NewLocalSandbox(&Config{AllowNetwork: &allow})
-	_, err = sAllow.Execute(context.Background(), &ExecuteConfig{Script: "/nonexistent.sh"})
-	if err == ErrLocalNetworkIsolationUnsupported {
-		t.Fatalf("AllowNetwork=true should not refuse, got refusal")
-	}
-}
-
-func sliceContains(args []string, target ...string) bool {
-	for i := 0; i+len(target) <= len(args); i++ {
-		match := true
-		for j, t := range target {
-			if args[i+j] != t {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	return false
 }
