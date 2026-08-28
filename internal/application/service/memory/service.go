@@ -28,6 +28,10 @@ var ErrItemNotFound = errors.New("memory: item not found")
 // Callers on the write path treat it as "nothing to do", not as a failure.
 var ErrPreviouslyForgotten = errors.New("memory: previously forgotten by the user")
 
+// ErrSensitiveContent means the statement was almost entirely credentials or
+// identity numbers, so redacting it left nothing worth remembering.
+var ErrSensitiveContent = errors.New("memory: statement was sensitive material")
+
 // rejectedMessageWindow is how long a rejected message keeps blocking
 // re-derivation. The case this closes is the debounced run that reads the same
 // message minutes after the user deleted what it produced; past that, whatever
@@ -298,6 +302,17 @@ func (s *Service) write(
 	content := types.SanitizeMemoryContent(item.Content)
 	if content == "" {
 		return nil, errors.New("memory: empty content")
+	}
+	// Redact before anything else looks at the statement. A memory is injected
+	// into the system prompt of every later turn, so a credential that reaches
+	// storage is not merely retained, it is re-sent to a model repeatedly.
+	if redacted, changed := types.RedactSensitive(content); changed {
+		if types.IsMostlyRedacted(redacted) {
+			logger.Infof(ctx, "memory: dropped a statement that was mostly sensitive material")
+			return nil, ErrSensitiveContent
+		}
+		logger.Infof(ctx, "memory: redacted sensitive material before storing")
+		content = types.SanitizeMemoryContent(redacted)
 	}
 	if !types.IsValidMemoryKind(item.Kind) {
 		item.Kind = types.MemoryKindFact
@@ -1140,7 +1155,7 @@ func (s *Service) observeTopics(
 			Importance: 3,
 			Origin:     types.MemoryOriginExtracted,
 		}); err != nil {
-			if !errors.Is(err, ErrPreviouslyForgotten) {
+			if !errors.Is(err, ErrPreviouslyForgotten) && !errors.Is(err, ErrSensitiveContent) {
 				logger.Warnf(ctx, "memory: promote interest failed: %v", err)
 			}
 			// Mark it promoted anyway: a topic the user has forgotten once
