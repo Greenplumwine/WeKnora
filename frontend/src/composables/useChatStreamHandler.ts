@@ -748,9 +748,14 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           if (toolCallEvent) {
             toolCallEvent.pending = false
             toolCallEvent.success = success
+            // On failure, prefer the full tool Output (stdout/stderr/exit code)
+            // which the backend ships in dataPayload.output; only fall back to
+            // the short Error label when no Output was attached. Showing just
+            // "Script exited with code N" hides the detail a human needs to
+            // diagnose the failure.
             toolCallEvent.output = success
               ? dataPayload.output || data.content
-              : dataPayload.error || data.content
+              : dataPayload.output || dataPayload.error || data.content
             toolCallEvent.error = !success ? dataPayload.error || data.content : undefined
             const duration =
               dataPayload.duration_ms !== undefined ? dataPayload.duration_ms : dataPayload.duration
