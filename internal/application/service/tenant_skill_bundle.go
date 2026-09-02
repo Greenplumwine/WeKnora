@@ -15,7 +15,6 @@ import (
 	"unicode"
 
 	"github.com/Tencent/WeKnora/internal/agent/skills"
-	"gopkg.in/yaml.v3"
 )
 
 // ErrSkillBundleInvalid marks every rejection of an uploaded archive, so the
@@ -42,6 +41,10 @@ type SkillBundle struct {
 	SHA256 string
 	// Files maps skill-root-relative paths to contents, SKILL.md included.
 	Files map[string][]byte
+	// FrontmatterRepaired is true when SKILL.md YAML had to be repaired
+	// before it would parse. The original file is unchanged; the install
+	// prompt tells the agent to mention this so the user can fix it.
+	FrontmatterRepaired bool
 }
 
 // SkillBundleParseOptions relaxes the uploaded-zip rules for archives pulled
@@ -271,15 +274,31 @@ func skillBundleFromFiles(archive []byte, files map[string][]byte) (*SkillBundle
 		return nil, fmt.Errorf("%w: %v", ErrSkillBundleInvalid, err)
 	}
 
-	sum := sha256.Sum256(archive)
 	return &SkillBundle{
-		Name:         skill.Name,
-		Version:      version,
-		Description:  skill.Description,
-		Instructions: skill.Instructions,
-		SHA256:       hex.EncodeToString(sum[:]),
-		Files:        files,
+		Name:                skill.Name,
+		Version:             version,
+		Description:         skill.Description,
+		Instructions:        skill.Instructions,
+		SHA256:              skillArchiveSHA256(archive),
+		Files:               files,
+		FrontmatterRepaired: skill.FrontmatterRepaired,
 	}, nil
+}
+
+func skillArchiveSHA256(archive []byte) string {
+	sum := sha256.Sum256(archive)
+	return hex.EncodeToString(sum[:])
+}
+
+// archiveMatchesSHA reports whether archive is the digest the row claims.
+// An empty expected digest is treated as unknown, not as a match against
+// whatever happens to be on disk — callers that want a fallback must opt in.
+func archiveMatchesSHA(archive []byte, want string) bool {
+	want = strings.TrimSpace(want)
+	if want == "" || len(archive) == 0 {
+		return false
+	}
+	return skillArchiveSHA256(archive) == want
 }
 
 // zipSkillFiles writes a deterministic skill-root zip so a remote archive that
@@ -361,7 +380,7 @@ func parseSkillBundleVersion(manifest string) (string, error) {
 		Version string `yaml:"version"`
 	}
 	frontmatter := strings.Join(lines[frontmatterStart+1:frontmatterEnd], "\n")
-	if err := yaml.Unmarshal([]byte(frontmatter), &metadata); err != nil {
+	if _, err := skills.UnmarshalSkillFrontmatter(frontmatter, &metadata); err != nil {
 		return "", err
 	}
 	return metadata.Version, nil

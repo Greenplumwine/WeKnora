@@ -390,6 +390,28 @@ func TestPruneSupersededSnapshotsLeavesTheRowWhenDeleteFails(t *testing.T) {
 		"a failed provider delete must not be recorded as deleted")
 }
 
+func TestPruneSupersededSnapshotsRetriesWhenSnapshotStillInUse(t *testing.T) {
+	fx := newReaperFixture(t)
+	fx.svc.snapshotRetention = time.Hour
+	old := fx.now.Add(-2 * time.Hour)
+	fx.live("snap-live")
+	fx.superseded("sk-1", "snap-old", "", old)
+	fx.provider.deleteErr = sandbox.NewRemoteError(
+		sandbox.SandboxTypeE2B, "DeleteSnapshot", sandbox.RemoteErrorKindConflict,
+		"cannot delete template because there are paused sandboxes using it", nil,
+	)
+
+	n, err := fx.svc.PruneSupersededSnapshots(context.Background())
+
+	require.NoError(t, err)
+	require.Zero(t, n)
+	require.Empty(t, fx.provider.deleted)
+	rows, err := fx.skills.ListSnapshotsByConfig(context.Background(), 7, "cfg-1")
+	require.NoError(t, err)
+	require.Equal(t, types.SkillSnapshotStateSuperseded, rows[0].State,
+		"an in-use template must stay on the ledger so the next sweep can retry")
+}
+
 func TestPruneSupersededSnapshotsTreatsMissingProviderSnapshotAsDeleted(t *testing.T) {
 	fx := newReaperFixture(t)
 	fx.svc.snapshotRetention = time.Hour
@@ -904,6 +926,28 @@ func (r *reaperSkillStore) DeleteUserEnvVar(
 }
 func (r *reaperSkillStore) DeleteUserEnvVarsByConfig(context.Context, uint64, string) error {
 	panic("DeleteUserEnvVarsByConfig is outside the reaper surface")
+}
+
+func (r *reaperSkillStore) CreateCatalog(context.Context, *types.TenantSkillCatalogEntity) error {
+	panic("CreateCatalog is outside the reaper surface")
+}
+func (r *reaperSkillStore) GetCatalog(context.Context, uint64, string) (*types.TenantSkillCatalogEntity, error) {
+	panic("GetCatalog is outside the reaper surface")
+}
+func (r *reaperSkillStore) GetCatalogByName(context.Context, uint64, string) (*types.TenantSkillCatalogEntity, error) {
+	panic("GetCatalogByName is outside the reaper surface")
+}
+func (r *reaperSkillStore) ListCatalogsByTenant(context.Context, uint64) ([]*types.TenantSkillCatalogEntity, error) {
+	panic("ListCatalogsByTenant is outside the reaper surface")
+}
+func (r *reaperSkillStore) UpdateCatalog(context.Context, *types.TenantSkillCatalogEntity) error {
+	panic("UpdateCatalog is outside the reaper surface")
+}
+func (r *reaperSkillStore) DeleteCatalog(context.Context, uint64, string) error {
+	panic("DeleteCatalog is outside the reaper surface")
+}
+func (r *reaperSkillStore) ListSkillsByCatalog(context.Context, uint64, string) ([]*types.TenantSkillEntity, error) {
+	panic("ListSkillsByCatalog is outside the reaper surface")
 }
 
 type reaperConfigStore struct {
