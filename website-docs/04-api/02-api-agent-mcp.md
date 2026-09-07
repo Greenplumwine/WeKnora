@@ -338,12 +338,14 @@ curl -X POST $BASE/api/v1/agent/mcp-oauth-resolutions/p-1/cancel -H "Authorizati
 
 ### GET /api/v1/skills
 
-用途：预加载技能列表（只读）。权限：Viewer+，仅 JWT。Handler: `internal/handler/skill_handler.go`
+用途：预加载技能列表（只读）。权限：Viewer+；API Key 必须 full-access（scoped key 403）。Handler: `internal/handler/skill_handler.go`
 
 响应：200 `{"success":true,"data":[{name,description}],"skills_available":bool}`
 
 ```bash
 curl $BASE/api/v1/skills -H "Authorization: Bearer $TOKEN"
+# 或 API Key（full-access）
+curl $BASE/api/v1/skills -H "X-API-Key: $API_KEY"
 ```
 
 安装、停用、文件浏览与环境变量走沙箱配置前缀 `/api/v1/sandbox-configs/{id}/skills*` 以及 `/api/v1/me/env-vars*`，完整示例见仓库 [`docs/api/skill.md`](../../docs/api/skill.md)。

@@ -75,8 +75,9 @@ func RegisterUserFavoriteRoutes(r *gin.RouterGroup, h *handler.UserResourceFavor
 func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler, g *rbacGuards) {
 	skills := r.Group("/skills")
 	{
-		// Usable skills for @ mention / chat — Viewer+
-		skills.GET("", g.Viewer(), skillHandler.ListSkills)
+		// Usable skills for @ mention / chat — Viewer+. Read-only metadata,
+		// declared for full-access API keys only; scoped keys stay denied.
+		g.apiKeyRoute(skills, http.MethodGet, "", apiKeyFullAccess(), g.Viewer(), skillHandler.ListSkills)
 		// Catalog reads are Viewer+ so the agent editor can show uninstalled skills.
 		skills.GET("/catalog", g.Viewer(), skillHandler.ListCatalog)
 	}
