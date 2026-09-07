@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/Tencent/WeKnora/internal/handler"
@@ -459,6 +460,70 @@ func TestSkillCatalogWriteRoutesRequireFullAccess(t *testing.T) {
 			}
 		})
 	}
+}
+
+// GET /api/v1/skills is read-only chat-picker metadata: declared for
+// full-access API keys only, never granted by a scoped capability.
+func TestSkillListRouteRequiresFullAccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	g := &rbacGuards{}
+	v1 := gin.New().Group("/api/v1")
+	RegisterSkillRoutes(v1, &handler.SkillHandler{}, g)
+
+	policy := mustLookupAPIKeyPolicy(t, g, http.MethodGet, "/api/v1/skills")
+	if !policy.RequireFullAccess {
+		t.Fatal("skill list must require full access without a matching capability")
+	}
+	if len(policy.Capabilities) != 0 {
+		t.Fatalf("skill list must not be granted by a scoped capability: %#v", policy.Capabilities)
+	}
+	// Catalog reads stay undeclared (default-deny for API keys).
+	if _, ok := g.apiKeyAuthorizer.Lookup(http.MethodGet, "/api/v1/skills/catalog"); ok {
+		t.Fatal("GET /skills/catalog must not be declared for API keys")
+	}
+}
+
+// Gate behavior: a full-access key reaches ListSkills, a scoped key is 403'd
+// before the handler, and the policy path matches gin's FullPath verbatim.
+func TestSkillListRouteGateBehavior(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	newEngine := func(g *rbacGuards, scope types.TenantAPIKeyScope) *gin.Engine {
+		g.ensureAPIKeyAuthorizer()
+		engine := gin.New()
+		engine.Use(func(c *gin.Context) {
+			c.Request = c.Request.WithContext(types.WithTenantAPIKeyScope(c.Request.Context(), scope))
+			c.Next()
+		})
+		engine.Use(g.apiKeyAuthorizer.Middleware())
+		v1 := engine.Group("/api/v1")
+		RegisterSkillRoutes(v1, &handler.SkillHandler{}, g)
+		return engine
+	}
+
+	t.Run("full access reaches handler", func(t *testing.T) {
+		g := &rbacGuards{}
+		engine := newEngine(g, types.TenantAPIKeyScope{FullAccess: true})
+
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/skills", nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("full-access key status = %d, want 200 body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("scoped key denied", func(t *testing.T) {
+		g := &rbacGuards{}
+		engine := newEngine(g, types.TenantAPIKeyScope{
+			Capabilities: types.StringArray{string(types.APIKeyCapabilityChat)},
+		})
+
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/skills", nil))
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("scoped key status = %d, want 403 body=%s", w.Code, w.Body.String())
+		}
+	})
 }
 
 func TestTenantMemberRoutesDeclareManageMembersCapability(t *testing.T) {
