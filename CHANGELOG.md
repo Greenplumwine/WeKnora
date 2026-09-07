@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Bug Fixes
+
+- **FIXED**: Volcengine Ark and Aliyun DashScope chat requests no longer send `max_tokens` and `max_completion_tokens` together — Ark rejects the pair with a 400 (`InvalidParameter`), which broke every agent conversation on those providers. Each provider adapter now converges the token budget onto `max_completion_tokens` (DashScope has deprecated `max_tokens`; Ark additionally clamps to its documented 65536 limit). Other providers are unchanged.
+
 ## [0.8.0] - 2026-09-03
 
 ### New Features

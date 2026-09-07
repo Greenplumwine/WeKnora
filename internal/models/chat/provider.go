@@ -129,6 +129,34 @@ func (qwenThinkingProvider) Thinking() ThinkingStrategy {
 	return enableThinking{alwaysSend: true, disableOnNonStream: true}
 }
 
+// ShapeRequest converges the token budget onto max_completion_tokens:
+// DashScope has deprecated max_tokens and mct covers reasoning + answer.
+// See 阿里云.md L627.
+func (qwenThinkingProvider) ShapeRequest(req *openai.ChatCompletionRequest, _ *ChatOptions, _ bool) {
+	if req.MaxCompletionTokens == 0 && req.MaxTokens > 0 {
+		req.MaxCompletionTokens = req.MaxTokens
+	}
+	req.MaxTokens = 0
+}
+
+// --- Aliyun catch-all: non-thinking models that would otherwise fall back to the
+// shared baseProvider (per-provider quirks must not live on baseProvider) ---
+
+type aliyunProvider struct{ baseProvider }
+
+func (aliyunProvider) Name() provider.ProviderName { return provider.ProviderAliyun }
+
+// ShapeRequest converges the token budget onto max_completion_tokens:
+// DashScope has deprecated max_tokens and mct covers reasoning + answer.
+// Matches inherits true from baseProvider, so every Aliyun model that is not a
+// Qwen thinking model lands here. See 阿里云.md L627.
+func (aliyunProvider) ShapeRequest(req *openai.ChatCompletionRequest, _ *ChatOptions, _ bool) {
+	if req.MaxCompletionTokens == 0 && req.MaxTokens > 0 {
+		req.MaxCompletionTokens = req.MaxTokens
+	}
+	req.MaxTokens = 0
+}
+
 // --- LKEAP: thinking via { "thinking": { "type": ... } }, only for DeepSeek V3.x ---
 // R1 series enables chain-of-thought by default and is left untouched (falls
 // back to baseProvider). See https://cloud.tencent.com/document/product/1772/115963
@@ -214,6 +242,20 @@ type volcengineProvider struct{ baseProvider }
 func (volcengineProvider) Name() provider.ProviderName { return provider.ProviderVolcengine }
 func (volcengineProvider) Thinking() ThinkingStrategy  { return thinkingTypeField{} }
 
+// ShapeRequest converges the token budget onto max_completion_tokens and clamps
+// it to Ark's limit: Ark rejects max_tokens and max_completion_tokens set at
+// the same time (400) and mct only accepts [1, 65536].
+// See 火山方舟.md L1236 / L1244.
+func (volcengineProvider) ShapeRequest(req *openai.ChatCompletionRequest, _ *ChatOptions, _ bool) {
+	if req.MaxCompletionTokens == 0 && req.MaxTokens > 0 {
+		req.MaxCompletionTokens = req.MaxTokens
+	}
+	req.MaxTokens = 0
+	if req.MaxCompletionTokens > 65536 {
+		req.MaxCompletionTokens = 65536
+	}
+}
+
 // --- Azure OpenAI: api-key auth (reasoning variant also strips sampling params) ---
 
 type azureProvider struct{ baseProvider }
@@ -279,6 +321,7 @@ func shapeOpenAIReasoning(req *openai.ChatCompletionRequest) {
 var providerRegistry = []providerAdapter{
 	weKnoraCloudProvider{},
 	qwenThinkingProvider{},
+	aliyunProvider{},
 	lkeapProvider{},
 	deepseekProvider{},
 	genericProvider{},
