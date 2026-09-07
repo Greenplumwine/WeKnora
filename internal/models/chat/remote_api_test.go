@@ -207,6 +207,76 @@ func TestBuildChatCompletionRequest_GPT5MaxCompletionTokens(t *testing.T) {
 	})
 }
 
+// TestBuildChatCompletionRequest_VolcengineAliyunMaxCompletionTokens verifies
+// that volcengine (Ark) and aliyun (DashScope) request bodies never carry
+// max_tokens and max_completion_tokens at the same time: Ark rejects the pair
+// with a 400 (火山方舟.md L1236) and DashScope has deprecated max_tokens
+// (阿里云.md L627). Ark also clamps mct to its documented range [1, 65536]
+// (火山方舟.md L1244); DashScope does not clamp. Other providers keep both
+// fields (baseProvider is intentionally untouched).
+func TestBuildChatCompletionRequest_VolcengineAliyunMaxCompletionTokens(t *testing.T) {
+	build := func(t *testing.T, providerName, modelName string) *RemoteAPIChat {
+		t.Helper()
+		c, err := NewRemoteAPIChat(&ChatConfig{
+			Source:    types.ModelSourceRemote,
+			ModelName: modelName,
+			APIKey:    "test-key",
+			ModelID:   modelName,
+			Provider:  providerName,
+		})
+		require.NoError(t, err)
+		return c
+	}
+
+	messages := []Message{{Role: "user", Content: "test"}}
+
+	cases := []struct {
+		name     string
+		provider string
+		model    string
+		optsMaxT int
+		optsMCT  int
+		wantMaxT int
+		wantMCT  int
+	}{
+		// volcengine (Ark): converge onto mct, clamp to 65536.
+		{"volcengine both set", "volcengine", "doubao-1-5-pro-32k", 4096, 4096, 0, 4096},
+		{"volcengine max_tokens only migrates", "volcengine", "doubao-1-5-pro-32k", 4096, 0, 0, 4096},
+		{"volcengine mct only unchanged", "volcengine", "doubao-1-5-pro-32k", 0, 2048, 0, 2048},
+		{"volcengine mct clamped to 65536", "volcengine", "doubao-1-5-pro-32k", 0, 100000, 0, 65536},
+		{"volcengine migrated max_tokens clamped", "volcengine", "doubao-1-5-pro-32k", 100000, 0, 0, 65536},
+		// aliyun (DashScope): converge onto mct, no clamp. qwen2.5-72b-instruct
+		// avoids every IsQwenThinkingModel prefix (qwen3/qwen-plus/qwen-max/
+		// qwen-turbo) so it lands on the catch-all aliyunProvider.
+		{"aliyun generic both set", "aliyun", "qwen2.5-72b-instruct", 4096, 4096, 0, 4096},
+		{"aliyun generic max_tokens only migrates", "aliyun", "qwen2.5-72b-instruct", 4096, 0, 0, 4096},
+		{"aliyun generic mct only unchanged", "aliyun", "qwen2.5-72b-instruct", 0, 2048, 0, 2048},
+		{"aliyun generic mct not clamped", "aliyun", "qwen2.5-72b-instruct", 0, 100000, 0, 100000},
+		// Status-quo guard: unrelated providers still send both fields.
+		{"generic provider keeps both fields", "generic", "test-model", 128, 2048, 128, 2048},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := build(t, tc.provider, tc.model)
+			opts := &ChatOptions{MaxTokens: tc.optsMaxT, MaxCompletionTokens: tc.optsMCT}
+			req := c.shapedRequest(messages, opts, false)
+			assert.Equal(t, tc.wantMaxT, req.MaxTokens)
+			assert.Equal(t, tc.wantMCT, req.MaxCompletionTokens)
+		})
+	}
+
+	t.Run("aliyun thinking model converges via qwenThinkingProvider", func(t *testing.T) {
+		c := build(t, "aliyun", "qwen3-32b")
+		_, ok := c.adapter.(qwenThinkingProvider)
+		require.True(t, ok, "qwen3-32b must route to qwenThinkingProvider")
+		opts := &ChatOptions{MaxTokens: 4096, MaxCompletionTokens: 4096}
+		req := c.shapedRequest(messages, opts, false)
+		assert.Equal(t, 0, req.MaxTokens)
+		assert.Equal(t, 4096, req.MaxCompletionTokens)
+	})
+}
+
 func TestBuildChatCompletionRequest_ToolChoice(t *testing.T) {
 	chat := newTestRemoteChat(t)
 	messages := []Message{{Role: "user", Content: "test"}}
