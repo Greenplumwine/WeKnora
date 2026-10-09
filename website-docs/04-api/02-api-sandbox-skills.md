@@ -9,7 +9,7 @@
 | 沙箱配置列表/详情 | Viewer+；API Key 必须 full-access | Admin+；API Key 必须 full-access |
 | 沙箱实例清单、已安装技能及文件 | Admin+ | Admin+；API Key 必须 full-access |
 | 技能目录列表 | Viewer+，JWT | 目录增删、安装、包文件浏览需 Admin+；写组的 API Key 必须 full-access |
-| `/skills` 可用技能 | Viewer+，JWT | 只读，查询参数 sandbox_config_id；共享智能体另传 agent_id、agent_source_tenant_id |
+| `/skills` 可用技能 | Viewer+；API Key 必须 full-access（scoped key 403） | 只读，查询参数 sandbox_config_id；共享智能体另传 agent_id、agent_source_tenant_id |
 | 会话交互终端 | 会话属主，仅登录 JWT | 取票据后建立 WebSocket |
 | `/me/env-vars*` | 已登录的当前调用者 | 仅修改自己，服务端推导身份；无额外管理员门槛，使用 Bearer JWT |
 
