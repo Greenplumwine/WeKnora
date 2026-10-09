@@ -99,7 +99,7 @@
                   <t-textarea
                     v-model="draftContent"
                     :placeholder="t('memorySettings.addPlaceholder')"
-                    :maxlength="300"
+                    :maxlength="1500"
                     :autosize="{ minRows: 3, maxRows: 6 }"
                   />
                 </label>
@@ -262,6 +262,7 @@
               <div v-if="editingId === item.id" class="memory-edit">
                 <t-textarea
                   v-model="editingContent"
+                  :maxlength="1500"
                   :autosize="{ minRows: 2, maxRows: 6 }"
                   @keydown.enter.ctrl="handleSaveEdit(item)"
                 />

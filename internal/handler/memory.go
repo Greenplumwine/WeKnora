@@ -454,8 +454,6 @@ func (h *MemoryHandler) fail(c *gin.Context, err error, message string) {
 		c.Error(apperrors.NewNotFoundError("memory not found"))
 	case errors.Is(err, types.ErrMemoryConflict):
 		c.Error(apperrors.NewConflictError(err.Error()))
-	case errors.Is(err, memory.ErrSensitiveContent):
-		c.Error(apperrors.NewBadRequestError(err.Error()))
 	case errors.Is(err, memory.ErrMemoryDisabled):
 		c.Error(apperrors.NewBadRequestError("memory is disabled"))
 	default:

@@ -38,7 +38,7 @@ const (
 	// read-only context, so a statement like "就用前面那个吧" can be resolved.
 	extractContextLines = 4
 	// extractMaxLineRunes truncates one very long pasted message.
-	extractMaxLineRunes = 1000
+	extractMaxLineRunes = 2000
 	// extractInFlightGrace is added to the configured delay to decide when an
 	// in-flight claim is stale. Without it, a worker that died between claiming
 	// and running would wedge the subject permanently.
@@ -65,11 +65,11 @@ const (
 	// extractBudgetTokens is the completion budget for one extraction call.
 	// The output is a small JSON object; the ceiling exists to bound a model
 	// that starts rambling, not because the task needs room.
-	extractBudgetTokens = 1200
+	extractBudgetTokens = 3000
 	// extractBudgetRetryTokens is the second attempt after a truncated one.
 	// Models that reason regardless of the disable flag need somewhere to put
 	// that reasoning before they can answer at all.
-	extractBudgetRetryTokens = 4000
+	extractBudgetRetryTokens = 6000
 	// extractFollowUpDelay is the wait before a run that hit its message cap,
 	// or that saw new turns arrive while it worked, queues its successor.
 	extractFollowUpDelay = 15 * time.Second
@@ -590,8 +590,6 @@ What to record
   award ceremonies and venue clearing that they organise events. Such entries
   are shown to the user for confirmation instead of taking effect silently, so
   a reasonable guess is welcome; a confident assertion is not.
-- Never record credentials, tokens, passwords, ID or card numbers, even if the
-  user pastes them.
 
 The "topics" list
 - Separately from memories, list the subjects the user asked about, however
@@ -1126,8 +1124,7 @@ func (s *Service) applyDecisions(
 				targetID = target.ID
 			}
 			if _, err := s.writeReplacing(ctx, scope, cfg, item, targetID); err != nil {
-				if errors.Is(err, ErrPreviouslyForgotten) || errors.Is(err, ErrSensitiveContent) ||
-					errors.Is(err, types.ErrMemoryConflict) {
+				if errors.Is(err, ErrPreviouslyForgotten) || errors.Is(err, types.ErrMemoryConflict) {
 					continue
 				}
 				return fmt.Errorf("apply memory decision: %w", err)
