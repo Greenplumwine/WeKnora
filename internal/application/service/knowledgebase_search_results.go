@@ -84,7 +84,10 @@ func (s *knowledgeBaseService) processSearchResults(ctx context.Context,
 	// Build final search results
 	searchResults := s.assembleSearchResults(ctx, chunks, chunkMap, knowledgeMap, index, skipEnrichment)
 
-	searchutil.EnrichSearchResultsImageInfo(ctx, s.chunkRepo, tenantID, searchResults)
+	// Results can come from org-shared KBs owned by another workspace; the
+	// chunks above were already permission checked, so look up their image
+	// children without the caller-tenant filter (#3342).
+	searchutil.EnrichSearchResultsImageInfoOnly(ctx, s.chunkRepo, searchResults)
 
 	logger.Infof(ctx, "Search results processed, total: %d", len(searchResults))
 	return searchResults, nil
@@ -192,10 +195,10 @@ func (s *knowledgeBaseService) collectParentChunkIDs(
 	return ids
 }
 
-// hasImageChunks returns true if any chunk is an image_ocr or image_caption type.
+// hasImageChunks returns true if any chunk is one of the image child types.
 func (s *knowledgeBaseService) hasImageChunks(chunks []*types.Chunk) bool {
 	for _, c := range chunks {
-		if c.ChunkType == types.ChunkTypeImageOCR || c.ChunkType == types.ChunkTypeImageCaption {
+		if types.IsImageChildChunkType(c.ChunkType) {
 			return true
 		}
 	}
@@ -353,8 +356,10 @@ func (s *knowledgeBaseService) buildSearchResult(chunk *types.Chunk,
 		KnowledgeDescription:    knowledge.Description,
 		KnowledgeCustomMetadata: knowledge.CustomMetadataText(),
 		ChunkMetadata:           chunk.Metadata,
+		ContextHeader:           chunk.ContextHeader,
 		MatchedContent:          matchedContent,
 		KnowledgeBaseID:         knowledge.KnowledgeBaseID,
+		SourceLocators:          chunk.SourceLocators,
 	}
 }
 
@@ -373,6 +378,6 @@ func (s *knowledgeBaseService) isSearchableChunk(chunk *types.Chunk) bool {
 		types.ChunkTypeText, types.ChunkTypeSummary,
 		types.ChunkTypeTableColumn, types.ChunkTypeTableSummary,
 		types.ChunkTypeFAQ,
-		types.ChunkTypeImageOCR, types.ChunkTypeImageCaption,
+		types.ChunkTypeImageOCR, types.ChunkTypeImageCaption, types.ChunkTypeImageVector,
 	}, chunk.ChunkType)
 }

@@ -38,8 +38,9 @@ async function fixture(options: {
   const saves: any[] = []
   const resolves: any[] = []
   const providers: any[] = options.providers || []
+  const catalogEvents: string[] = []
   const providersStore = {
-    ensureLoaded: async () => providers,
+    ensureLoaded: async (_type?: string, force?: boolean) => { catalogEvents.push(force ? 'refresh' : 'load'); return providers },
     providersFor: () => providers,
     isLoading: () => false,
     providerById: (id: string) => providers.find((p) => p.value === id),
@@ -82,6 +83,9 @@ async function fixture(options: {
         } },
       }
       if (name === '@/stores/modelProviders') return { useModelProvidersStore: () => providersStore }
+      if (name === '@/api/model') return { getWeKnoraCloudStatus: async () => ({ has_models: true, needs_reinit: false }) }
+      if (name === '@/utils/weknoraCloudModels') return require('../utils/weknoraCloudModels.ts')
+      if (name === '@/utils/docsUrl') return require('../utils/docsUrl.ts')
       if (name === '@/stores/modelProvidersState') return require('../stores/modelProvidersState.ts')
       if (name === '@/utils/reasoningEffort') return require('../utils/reasoningEffort.ts')
       if (name === '@/utils/contextWindow') return require('../utils/contextWindow.ts')
@@ -111,7 +115,7 @@ async function fixture(options: {
   Object.assign(vm.formData, { modelName: 'draft-model', baseUrl: 'https://example.com/v1', apiKey: options.edit ? '' : 'draft-key' })
   vm.formRef = { validate: async () => true }
   await nextTick()
-  return { vm, props, requests, saves, toasts, visibility, resolves, close: () => app.unmount() }
+  return { vm, props, requests, saves, toasts, visibility, resolves, catalogEvents, close: () => app.unmount() }
 }
 
 for (const type of ['chat', 'embedding', 'rerank', 'vllm', 'asr']) {
@@ -423,6 +427,49 @@ test('picking a catalog model fills blank capability fields only', async () => {
     f.vm.handleCatalogModelCreate(' my-custom-model ')
     assert.equal(f.vm.formData.modelName, 'my-custom-model')
     assert.equal(f.vm.catalogModelOptions[0].value, 'my-custom-model', 'free text stays selectable')
+  } finally { f.close() }
+})
+
+const embeddingProviders = [{
+  value: 'volcengine', label: 'Volcengine', description: '', order: 1, icon: '',
+  defaultUrls: { embedding: 'https://ark.cn-beijing.volces.com/api/v3' },
+  modelTypes: ['embedding'],
+  models: [
+    { id: 'doubao-embedding-vision-251215', name: 'Doubao Embedding Vision', type: 'embedding', input: ['text', 'image', 'video'], dimension: 2048 },
+    { id: 'doubao-embedding-text', name: 'Doubao Embedding Text', type: 'embedding', dimension: 2048 },
+  ],
+}]
+
+test('embedding image input follows the catalog and stores only a differing declaration', async () => {
+  const f = await fixture({ type: 'embedding', providers: embeddingProviders })
+  try {
+    f.vm.formData.provider = 'volcengine'
+    f.vm.formData.modelName = 'doubao-embedding-vision-251215'
+    f.vm.handleCatalogModelChange('doubao-embedding-vision-251215')
+    await nextTick()
+    assert.equal(f.vm.embeddingAcceptsImages, true, 'catalogued multimodal model')
+    assert.equal(f.vm.formData.spec, null, 'the catalog answer is not copied into the row')
+
+    f.vm.embeddingAcceptsImages = false
+    assert.deepEqual(plain(f.vm.formData.spec), { input: ['text'] }, 'narrowing the catalog is a declaration')
+    f.vm.embeddingAcceptsImages = true
+    assert.equal(f.vm.formData.spec, null, 'back to the catalog answer drops it again')
+
+    // A custom model has nothing in the catalog; declaring image input sticks
+    // next to whatever else spec already carries.
+    f.vm.formData.spec = { compat: { encoding_format: 'float' } }
+    f.vm.handleCatalogModelCreate('my-clip')
+    await nextTick()
+    assert.equal(f.vm.embeddingAcceptsImages, false)
+    f.vm.embeddingAcceptsImages = true
+    assert.deepEqual(plain(f.vm.formData.spec), { compat: { encoding_format: 'float' }, input: ['text', 'image'] })
+
+    // Picking a catalogued model discards a declaration made for another one.
+    f.vm.formData.modelName = 'doubao-embedding-text'
+    f.vm.handleCatalogModelChange('doubao-embedding-text')
+    await nextTick()
+    assert.equal(f.vm.embeddingAcceptsImages, false)
+    assert.deepEqual(plain(f.vm.formData.spec), { compat: { encoding_format: 'float' } })
   } finally { f.close() }
 })
 
@@ -767,6 +814,49 @@ test('the vision picker lists the vendor models the backend scoped to it', async
   } finally { f.close() }
 })
 
+const cloudProvider = {
+  value: 'weknoracloud', label: 'WeKnora Cloud', description: '', order: 1,
+  modelTypes: ['chat', 'embedding', 'rerank', 'vllm'],
+  defaultUrls: Object.fromEntries(['chat', 'embedding', 'rerank', 'vllm'].map(type => [type, 'https://weknora.weixin.qq.com'])),
+  models: [],
+}
+
+for (const [type, modelName] of [['chat', 'chat'], ['embedding', 'embedding'], ['rerank', 'rerank'], ['vllm', 'vlm']]) {
+  test(`WeKnora Cloud ${type}: an empty catalog still offers the managed model`, async () => {
+    const f = await fixture({ type, providers: [cloudProvider] })
+    try {
+      f.vm.formData.provider = 'weknoracloud'
+      f.vm.handleProviderChange('weknoracloud')
+      await nextTick()
+      await f.vm.checkWkcCredentialStatus()
+      assert.equal(f.vm.wkcCredentialState, 'configured')
+      assert.deepEqual(Array.from(f.vm.catalogModelOptions, (o: any) => o.value), [modelName])
+      assert.equal(f.vm.catalogModelOptions[0].vision, type === 'vllm')
+      f.vm.formData.modelName = modelName
+      f.vm.handleCatalogModelChange(modelName)
+      await nextTick()
+      await f.vm.checkRemoteAPI()
+      assert.equal(f.requests[0].modelName, modelName)
+      assert.equal(f.requests[0].provider, 'weknoracloud')
+      assert.equal(f.vm.formData.contextWindow, undefined)
+      assert.equal(f.vm.formData.dimension, undefined)
+    } finally { f.close() }
+  })
+}
+
+test('switching WeKnora Cloud model types updates the managed choices', async () => {
+  const f = await fixture({ providers: [cloudProvider] })
+  try {
+    f.vm.formData.provider = 'weknoracloud'
+    f.vm.handleProviderChange('weknoracloud')
+    await nextTick()
+    f.vm.formData.modelName = 'chat'
+    await f.vm.selectModelType('vllm')
+    assert.equal(f.vm.formData.modelName, '')
+    assert.deepEqual(Array.from(f.vm.catalogModelOptions, (o: any) => o.value), ['vlm'])
+  } finally { f.close() }
+})
+
 test('rerank and asr pickers list their own entries', async () => {
   for (const [type, id] of [['rerank', 'the-reranker'], ['asr', 'the-transcriber']]) {
     const providers = [{
@@ -883,4 +973,45 @@ test('extraFieldDisplayPlaceholder resolves the vendor placeholder for the activ
   } finally {
     f.close()
   }
+})
+
+for (const type of ['chat', 'embedding', 'rerank', 'vllm', 'asr']) {
+  test(`${type}: connection tests include edited spec and clearing compat`, async () => {
+    const f = await fixture({ type })
+    try {
+      f.vm.formData.spec = { context_window: 64000, compat: { old: true } }
+      f.vm.formData.specCompat = '{"custom_option": true}'
+      await f.vm.checkRemoteAPI()
+      assert.deepEqual(plain(f.requests[0].spec), { context_window: 64000, compat: { custom_option: true } })
+      f.vm.formData.specCompat = ''
+      await nextTick()
+      assert.equal(f.vm.remoteChecked, false, 'editing spec invalidates the old connection result')
+      await f.vm.checkRemoteAPI()
+      assert.deepEqual(plain(f.requests[1].spec), { context_window: 64000 })
+    } finally { f.close() }
+  })
+}
+
+test('capability preview includes the same edited spec as connection tests', async () => {
+  const f = await fixture({ type: 'chat' })
+  try {
+    f.vm.formData.provider = 'openai'
+    f.vm.formData.spec = { api: 'openai-completions' }
+    f.vm.formData.specCompat = '{"supports_temperature": false}'
+    await f.vm.runResolve()
+    assert.deepEqual(plain(f.resolves.at(-1).spec), { api: 'openai-completions', compat: { supports_temperature: false } })
+  } finally { f.close() }
+})
+
+test('opening the model editor refreshes its catalog candidates', async () => {
+  const f = await fixture()
+  try {
+    assert.equal(f.catalogEvents[0], 'refresh')
+    f.props.visible = false
+    await nextTick()
+    f.catalogEvents.length = 0
+    f.props.visible = true
+    await nextTick()
+    assert.equal(f.catalogEvents[0], 'refresh')
+  } finally { f.close() }
 })
