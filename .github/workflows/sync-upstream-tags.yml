@@ -1,0 +1,118 @@
+name: Sync Upstream Tags
+
+# 每日自动 + 手动同步 Tencent/WeKnora 的 tags 到本 fork。
+# 语义:
+#   - 上游新增/重打的 tag → 同步到 fork(重打时仅当 fork 上的该 tag 确为上次同步的旧值才覆盖)
+#   - 上游删除的 tag       → fork 上同步删除(仅当该 tag 仍是上次同步的旧值)
+#   - 自建 tag(不在上游快照里) → 永不触碰; 与上游重名但内容不同的 tag → 跳过并在日志警告
+# 机制: 把"上次同步的上游 tag 清单(SHA)"存于 meta/upstream-tags 分支的
+# upstream-tags.txt,逐轮对比,据此判定哪些 tag 是"上游管理的",哪些是"你的"。
+
+on:
+  schedule:
+    - cron: '30 21 * * *' # UTC 21:30 = 北京时间每日 05:30
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-tags
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_REPO: Tencent/WeKnora
+      SNAP_BRANCH: meta/upstream-tags
+      SNAP_FILE: upstream-tags.txt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync upstream tags
+        run: |
+          set -euo pipefail
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+
+          # 上游 tag 镜像到临时命名空间,不与本地/origin 的 refs/tags 混合
+          git fetch upstream '+refs/tags/*:refs/upstream-tags/*' --prune --force
+
+          # 当前上游 tag -> 剥离后 SHA(annotated 取 ^{} 剥离值)
+          git for-each-ref refs/upstream-tags \
+            --format='%(refname) %(*objectname) %(objectname)' \
+          | awk '{peeled = (NF==3 ? $3 : $2); print $1" "peeled}' | sort > /tmp/new.txt
+
+          # 上次同步快照(首轮为空)
+          if git ls-remote --exit-code --heads origin "${SNAP_BRANCH}" >/dev/null 2>&1; then
+            git fetch origin "${SNAP_BRANCH}"
+            git show "FETCH_HEAD:${SNAP_FILE}" | sort > /tmp/old.txt
+          else
+            : > /tmp/old.txt
+          fi
+
+          # fork 当前 tag -> 剥离后 SHA
+          git ls-remote --tags origin \
+          | awk -F'\t' '
+              $2 ~ /\^\{\}$/ { sub(/\^\{\}$/,"",$2); m[$2]=$1; next }
+              !($2 in m)     { m[$2]=$1 }
+              END { for (k in m) print k" "m[k] }' | sort > /tmp/origin.txt
+
+          pushed=0; deleted=0; skipped=0
+          summary=""
+
+          # 新增/变更: 上游有、且 fork 上要么没有、要么就是上次同步的旧值
+          join_add=$(comm -23 /tmp/new.txt /tmp/origin.txt)
+          while read -r ref sha; do
+            [ -z "$ref" ] && continue
+            old_sha=$(awk -v r="$ref" '$1==r{print $2}' /tmp/old.txt)
+            origin_sha=$(awk -v r="$ref" '$1==r{print $2}' /tmp/origin.txt)
+            if [ -n "$origin_sha" ] && [ -n "$old_sha" ] && [ "$origin_sha" != "$old_sha" ]; then
+              summary="${summary}- ⚠️ 跳过 ${ref}: fork 上存在同名但内容不同的 tag(疑似自建),不覆盖"$'\n'
+              skipped=$((skipped+1)); continue
+            fi
+            git push origin "+refs/upstream-tags/${ref#refs/upstream-tags/}:refs/tags/${ref#refs/tags/}" >/dev/null
+            summary="${summary}- 同步 ${ref} (${sha:0:12})"$'\n'
+            pushed=$((pushed+1))
+          done <<< "$join_add"
+
+          # 删除: 上次同步过、上游现已没有、且 fork 上仍是同步旧值
+          join_del=$(comm -23 /tmp/old.txt /tmp/new.txt)
+          while read -r ref sha; do
+            [ -z "$ref" ] && continue
+            origin_sha=$(awk -v r="$ref" '$1==r{print $2}' /tmp/origin.txt)
+            if [ "$origin_sha" == "$sha" ]; then
+              git push origin --delete "refs/tags/${ref#refs/tags/}" >/dev/null
+              summary="${summary}- 删除 ${ref} (上游已移除)"$'\n'
+              deleted=$((deleted+1))
+            else
+              summary="${summary}- ⚠️ 保留 ${ref}: 上游已删但 fork 上内容已变(疑似自建),不删"$'\n'
+              skipped=$((skipped+1))
+            fi
+          done <<< "$join_del"
+
+          # 更新快照分支
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "${SNAP_BRANCH}" >/dev/null 2>&1; then
+            git checkout -B "${SNAP_BRANCH}" FETCH_HEAD
+          else
+            git checkout -B "${SNAP_BRANCH}"
+          fi
+          cp /tmp/new.txt "${SNAP_FILE}"
+          git add "${SNAP_FILE}"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(tags): refresh upstream tag snapshot ($(date -u +%F))"
+          fi
+          git push origin "${SNAP_BRANCH}" >/dev/null
+
+          {
+            echo "### 同步结果"
+            echo "- 新增/更新: ${pushed}"
+            echo "- 删除: ${deleted}"
+            echo "- 跳过(疑似自建): ${skipped}"
+            echo "- 快照 tag 总数: $(wc -l < /tmp/new.txt)"
+            [ -n "$summary" ] && echo "$summary"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "pushed=${pushed} deleted=${deleted} skipped=${skipped}"
