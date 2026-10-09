@@ -71,7 +71,8 @@ jobs:
               summary="${summary}- ⚠️ 跳过 ${ref}: fork 上存在同名但内容不同的 tag(疑似自建),不覆盖"$'\n'
               skipped=$((skipped+1)); continue
             fi
-            git push origin "+refs/upstream-tags/${ref#refs/upstream-tags/}:refs/tags/${ref#refs/tags/}" >/dev/null
+            name="${ref#refs/upstream-tags/}"
+            git push origin "+refs/upstream-tags/${name}:refs/tags/${name}" >/dev/null
             summary="${summary}- 同步 ${ref} (${sha:0:12})"$'\n'
             pushed=$((pushed+1))
           done <<< "$join_add"
