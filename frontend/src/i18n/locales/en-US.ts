@@ -3507,11 +3507,11 @@ export default {
         imageLoadError: 'Image failed to load',
         noCaption: 'No caption',
         noOcr: 'No text recognized',
-        caption: 'Caption',
-        ocr: 'Text in image (OCR)',
-        attributes: 'Attributes',
+        caption: 'Image description',
+        ocr: 'Text in image',
+        attributes: 'Image attributes',
         source: 'Source document',
-        details: 'Details',
+        details: 'Basic information',
         dimensions: 'Size',
         status: 'Status',
         openSource: 'Open source document',
@@ -3626,6 +3626,16 @@ export default {
       helpZoomDesc: 'Zoom the canvas',
       neighborsProgress: 'Showing {visible} of {total} neighbors ({hidden} not loaded)',
       neighborsAllShown: 'All {total} neighbors are already on the canvas (click Expand to focus on this node’s subgraph)',
+      graphNavigationHint: 'Drag the canvas to pan · Scroll to zoom',
+      focusGroup: 'Focus this group',
+      focusGroupViewing: 'Viewing: {name}',
+      focusGroupBack: 'Back to full graph',
+      focusGroupSwitch: 'Switch to another group',
+      unlinkedHidden: '{count} unlinked pages hidden',
+      unlinkedSection: 'Unlinked pages · {count}',
+      offscreenSection: 'No visible connections (links exist) · {count}',
+      hideUnlinked: 'Hide unlinked pages ({count})',
+      showUnlinked: 'Show unlinked pages ({count})',
       neighborsNone: 'This page has no linked neighbors',
       neighborsCenterUnreachable: 'Showing {visible} of {total} neighbors ({hidden} unreachable: dead links, filtered, or deleted)',
       neighborsOverviewHidden: 'Showing {visible} of {total} neighbors ({hidden} outside the overview — click Expand to pivot here)',
@@ -4040,6 +4050,7 @@ export default {
         desktopRetry: 'Reconnect',
         notStarted: 'The terminal is not running yet. Starting it connects to this conversation\'s sandbox, creating or resuming one if none is available.',
         paused: 'This conversation\'s sandbox is paused. Starting the terminal resumes it.',
+        stopped: 'This conversation\'s sandbox is not running: it was stopped, or reclaimed after being idle. Starting the terminal restarts it; if it was reclaimed, a new sandbox is created and previous files and installed software are not kept.',
         start: 'Start terminal',
         connecting: 'Connecting to sandbox…',
         needsProvision: 'This conversation has no running sandbox. Creating one starts a new sandbox, billed according to your workspace configuration.',
@@ -4050,6 +4061,8 @@ export default {
         retry: 'Reconnect',
         sessionEnded: 'Terminal session ended',
         idleDisconnected: 'The terminal disconnected after being idle. The sandbox will pause on its own TTL. You can reconnect.',
+        idleDisconnectedNewShell: 'The terminal disconnected after being idle and its shell has ended (background jobs started with nohup keep running). Reconnecting opens a new shell.',
+        disconnectedNewShell: 'Connection lost and the terminal\'s shell has ended (background jobs started with nohup keep running). Reconnecting opens a new shell.',
         authRevoked: 'Your session is no longer valid, so the terminal was disconnected. Sign in again, then reconnect.',
     },
     questionMinimapTitle: 'Q&A',
@@ -4390,35 +4403,26 @@ export default {
       },
       sections: {
         access: {
-          tab: 'Accounts & access {count}',
-          title: 'Accounts & access',
-          description: 'Manage system administrators, public registration, and workspace-creation rules.'
+          title: 'Registration & access',
+          description: 'Manage registration, password requirements, and workspace-creation rules.'
         },
         tenant: {
-          tab: 'Workspace defaults {count}',
           title: 'Workspace defaults',
           description: 'Set initial quotas and compatibility behavior for new workspaces without rewriting existing workspaces.'
         },
         runtime: {
-          tab: 'Runtime & concurrency {count}',
           title: 'Runtime & concurrency',
           description: 'Configure concurrency capacity for background worker pools and model services.',
           restartHint: 'Worker settings require restart'
         },
         security: {
-          tab: 'Network security {count}',
           title: 'Network security',
           description: 'Manage the SSRF allowlist and whether the Docker sandbox is allowed (a local docker.sock is equivalent to root on the host).'
         },
         other: {
-          tab: 'Other {count}',
           title: 'Other settings',
           description: 'Settings in this deployment that are not part of a standard product group.'
         }
-      },
-      runtimeTable: {
-        setting: 'Setting and purpose',
-        value: 'Current value'
       },
       runtime: {
         title: 'Task Queue Runtime',
@@ -4738,34 +4742,45 @@ export default {
         success: 'Reset to default',
         failed: 'Reset failed'
       },
-      admins: {
-        label: 'System administrators',
-        description: 'Users with platform-level privileges. Type an email and press Enter to promote a user; click × on a tag to revoke. You (yourself) are an administrator and are not shown in the list — you cannot revoke your own access.',
-        placeholder: 'Type a user email and press Enter',
-        loadFailed: 'Failed to load system administrators',
-        saveSuccess: 'System administrators updated',
-        saveFailed: 'Failed to update system administrators',
-        confirm: {
-          promote: {
-            header: 'Promote to system administrator',
-            body: 'Promote {email} to system administrator? This user will gain platform-level privileges: access to every workspace, system settings, and the admin roster itself.',
-            confirmBtn: 'Promote'
-          },
-          revoke: {
-            header: 'Revoke system administrator',
-            body: 'Revoke system-administrator privileges from {email}? They will lose access to all system-level features.',
-            confirmBtn: 'Revoke'
-          }
-        }
+      userList: {
+        title: 'Platform users',
+        rowLabel: 'User management',
+        rowDesc: 'View every registered user across workspaces, with pagination and username/email filtering.',
+        searchPlaceholder: 'Filter by username or email (current page)',
+        refresh: 'Refresh',
+        active: 'Active',
+        inactive: 'Disabled',
+        colUsername: 'Username',
+        colStatus: 'Status',
+        colRole: 'Role',
+        colCreated: 'Created',
+        colAction: 'Actions',
+        prev: 'Previous',
+        next: 'Next',
+        pageCount: '{shown} shown / {total} on page',
+        enable: 'Enable',
+        disable: 'Disable',
+        resetPassword: 'Reset password',
+        confirmDisable: 'Disable account {name}? Their active sessions will be revoked immediately.',
+        confirmEnable: 'Enable account {name}?',
+        enabledMsg: 'Enabled {name}',
+        disabledMsg: 'Disabled {name}',
+        actionFailed: 'Action failed',
+        loadFailed: 'Failed to load users',
+        roleAdmin: 'System admin',
+        roleUser: 'Regular user',
+        confirmRevoke: 'Revoke system-admin privileges from {name}?',
+        confirmPromote: 'Promote {name} to system administrator?',
+        revokeBtn: 'Revoke',
+        promoteBtn: 'Promote',
+        revokedMsg: 'Revoked admin privileges from {name}',
+        promotedMsg: 'Promoted {name} to system administrator',
+        roleFailed: 'Failed to change role',
       },
       passwordReset: {
-        label: 'Reset user password',
-        description: 'Set a new password for another user who cannot sign in. A successful reset invalidates all of that user\'s current sessions, so they must sign in again with the new password.',
-        action: 'Reset password',
         dialogTitle: 'Reset another user\'s password',
         warning: 'This is a high-risk action. Verify the user email carefully. You cannot reset your own password here.',
         emailLabel: 'User email',
-        emailPlaceholder: 'Enter the email of the user to reset',
         newPasswordLabel: 'New password',
         newPasswordPlaceholder: 'Enter new password',
         confirmPasswordLabel: 'Confirm new password',
@@ -4775,8 +4790,6 @@ export default {
         failed: 'Failed to reset password',
       },
       createUser: {
-        label: 'Create user',
-        description: 'Provision a new local user account. If the platform\'s default workspace mode is set to "create personal", the user gets a personal workspace just like a self-registered user would.',
         action: 'Create user',
         dialogTitle: 'Create a new user',
         warning: 'This is a high-risk action. Verify the username and email carefully — they are how the new user will sign in.',
@@ -4799,10 +4812,6 @@ export default {
           usernameLength: 'Username must be 2-50 characters',
           emailRequired: 'Enter an email address',
           emailInvalid: 'Enter a valid email address',
-          passwordRequired: 'Enter a new password',
-          passwordLength: 'Password must be 8-32 characters',
-          passwordLetter: 'Password must contain a letter',
-          passwordNumber: 'Password must contain a number',
           confirmRequired: 'Enter the new password again',
           passwordMismatch: 'The passwords do not match'
         },
