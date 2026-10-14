@@ -2422,6 +2422,9 @@ export default {
     "serverDocumentation": "Исходная документация сервера",
     "noServerDocumentation": "Ответ initialize этого MCP-сервера не содержит instructions / serverInfo.description (оба поля необязательны). Текст инструментов — в description ниже.",
     "policyHint": "Настройки включения и подтверждения сохраняются сразу и не сбрасываются при обновлении каталога.",
+    "columnTool": "Инструмент",
+    "columnEnabled": "Вкл.",
+    "columnApproval": "Подтв.",
     "failed": "Не удалось загрузить каталог инструментов",
     "setupProgress": "Шаги настройки MCP",
     "connection": "Подключение",
@@ -2464,6 +2467,9 @@ export default {
     authTypeApiKey: 'API Key / Token',
     authTypeOAuth: 'OAuth 2.0 (авторизация при первом подключении)',
     oauthScopes: 'Области (необязательно, через пробел)',
+    oauthClientId: 'Client ID (необязательно)',
+    oauthClientIdDesc: 'Клиент, заранее зарегистрированный на сервере авторизации. Оставьте пустым, чтобы зарегистрировать клиента автоматически (динамическая регистрация). При смене Client ID обновите и Client Secret.',
+    oauthClientSecret: 'Client Secret (необязательно)',
     oauthAuthorization: 'Статус авторизации',
     oauthAuthorized: 'Авторизовано',
     oauthRefreshable: 'Срок действия токена истёк; он будет автоматически обновлён при следующем использовании',
@@ -3992,6 +3998,7 @@ export default {
     truncatedHint: 'Ответ обрезан на лимите вывода модели за один ответ. Выше — то, что было создано до обрыва.',
     rewind: {
       tooltip: 'Откатить сюда',
+      confirmTitle: 'Откатить сюда?',
       confirmBody: 'Сообщения после этой точки будут удалены. Откат от вопроса также убирает сам вопрос и возвращает его во ввод. Рабочая область откатится, если есть контрольная точка. Отменить действие нельзя.',
       confirmButton: 'Откатить',
       cancelButton: 'Отмена',
@@ -5335,7 +5342,13 @@ export default {
     mcpStale: 'Нужна повторная синхронизация',
     belongsToKb: 'База знаний: ',
     belongsToOrg: 'Пространство: ',
-    noCompatibleKbForAgent: 'Инструменты текущего агента не соответствуют возможностям ни одной базы знаний в области видимости — нечего упомянуть.'
+    noCompatibleKbForAgent: 'Инструменты текущего агента не соответствуют возможностям ни одной базы знаний в области видимости — нечего упомянуть.',
+    tag: 'Теги',
+    searchPlaceholder: 'Поиск баз, файлов, навыков…',
+    searchInGroup: 'Поиск в разделе «{group}»…',
+    typeToSearch: "Продолжайте ввод после {'@'} для поиска…",
+    viewAll: 'Показать все',
+    back: 'Назад'
   },
   common: {
     add: 'Добавить',
@@ -6256,6 +6269,7 @@ export default {
       skillTranscriptLive: 'Ход установки',
       skillTranscriptLiveHint: 'Идёт установка — нажмите, чтобы смотреть',
       skillTranscriptTitle: 'Ход установки',
+      skillTranscriptPrompt: 'Инструкции по установке',
       skillTranscriptHide: 'Hide install run',
       skillGuidance: {
         placeholder: 'Добавьте указания по установке: нужные CLI, документацию или ограничения среды',
@@ -6374,6 +6388,7 @@ export default {
       installedCount: 'Установлен в {count} песочницах',
       installPanelGroup: 'Установлено',
       installPanelAvailable: 'Не установлено',
+      installAction: 'Установить',
       viewInstallProgress: 'Смотреть ход',
       manageOnSandbox: 'Управление в песочнице «{name}»',
       manageDrawerDesc: 'В песочнице «{name}» можно включать навык, править переменные и удалять установку.',
@@ -7830,6 +7845,7 @@ export default {
   },
   menu: {
     sessionInProgress: 'Диалог выполняется',
+    sessionUnread: 'Новый ответ',
     knowledgeBase: 'База знаний',
     agents: 'Агенты',
     artifacts: 'Артефакты',
