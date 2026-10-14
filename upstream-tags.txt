@@ -43,3 +43,4 @@ refs/upstream-tags/v0.7.1 c64a48647cd6f7eb8b0fb020b2e8fec74ee375fb
 refs/upstream-tags/v0.7.2 3d5d8bfcdfeeea266b292b71cea616847af28d0f
 refs/upstream-tags/v0.8.0 1edcd54b43606d9079bb36650efe3f68707a79ea
 refs/upstream-tags/v0.8.2 3e8b0bfc80b845b2d4b2ed683994748741450a97
+refs/upstream-tags/v0.8.3 3e22822c1d2397be730c458c7539d0eb8c113a24
