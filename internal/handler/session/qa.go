@@ -71,6 +71,7 @@ type qaRequestContext struct {
 	attachmentMetas       types.MessageAttachments // Metadata-only view of attachmentIDs for the persisted user message
 	suggestionAttribution *types.SuggestionAttribution
 	questionOrigin        *types.QuestionOrigin
+	pageContext           *types.PageContext
 	// resourceRewriter turns internal storage references in the outbound stream
 	// into directly loadable URLs when the caller asks for `resource_urls=public`.
 	// Disabled (a pass-through) in the default handle mode.
@@ -99,13 +100,24 @@ type qaRequestContext struct {
 	// turnLeaseHeld records that executeQA already took the send-side turn
 	// lease for this request, so the QA service does not take a second one.
 	turnLeaseHeld bool
+	// resume continues a suspended run on assistantMessage instead of
+	// starting a turn.
+	resume *types.AgentResume
 }
 
 // buildQARequest converts the qaRequestContext into a types.QARequest for service invocation.
 // steerSink rides along when the caller set one, so agent runs drain mid-run
 // message injections at round boundaries.
+// calledWithAPIKey reports an X-API-Key caller; the prompt endpoints are
+// closed to API keys, so such a caller cannot answer a question.
+func calledWithAPIKey(ctx context.Context) bool {
+	_, ok := types.TenantAPIKeyScopeFromContext(ctx)
+	return ok
+}
+
 func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 	imageURLs, imageDescription := extractImageURLsAndOCRText(rc.images)
+	interactive := !calledWithAPIKey(rc.ctx)
 	req := &types.QARequest{
 		Session:             rc.session,
 		Query:               rc.query,
@@ -126,7 +138,13 @@ func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 		LocalBrowserEnabled: rc.localBrowserEnabled,
 		Attachments:         rc.attachments,
 		QuestionOrigin:      rc.questionOrigin,
+		PageContext:         rc.pageContext,
 		TurnLeaseHeld:       rc.turnLeaseHeld,
+		// Only a caller that can answer the prompt later may leave the run
+		// suspended; an API-key caller would get a turn with no answer.
+		Suspendable: interactive,
+		Interactive: interactive,
+		Resume:      rc.resume,
 	}
 	if rc.steerSink != nil {
 		req.SteerSink = rc.steerSink
@@ -250,11 +268,11 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		return nil, nil, err
 	}
 
-	// The built-in wiki fixer is invoked from a KB page, not from a tenant's
-	// regular agent picker. When the KB is shared, run it in the source tenant
-	// only if the caller has edit permission, so KB-scoped models/tools resolve
-	// without granting viewers write capability.
-	if customAgent != nil && customAgent.ID == types.BuiltinWikiFixerID {
+	// KB-anchored built-in agents (wiki fixer, assistant) are opened from a KB
+	// page, not from a tenant's regular agent picker. When the KB is shared,
+	// run them in the source tenant only if the caller has edit permission, so
+	// KB-scoped models/tools resolve without granting viewers write capability.
+	if types.RunsInSharedKBWorkspace(customAgent) {
 		if scopedAgent, scopedTenantID := h.resolveWikiFixerTenantScope(
 			ctx,
 			customAgent,
@@ -482,6 +500,7 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		attachmentMetas:       attachmentMetas,
 		suggestionAttribution: request.SuggestionAttribution,
 		questionOrigin:        request.QuestionOrigin,
+		pageContext:           request.PageContext,
 		reqAgentEnabled:       request.AgentEnabled,
 		reqAgentID:            request.AgentID,
 		resourceRewriter:      resourceRewriter,
@@ -806,6 +825,9 @@ func (h *Handler) setupSSEStream(reqCtx *qaRequestContext, generateTitle bool, m
 		reqCtx.userCreatedAt,
 		reqCtx.assistantMessage,
 	)
+	if reqCtx.resume != nil {
+		h.writeRunResumedEvent(reqCtx.ctx, reqCtx.sessionID, reqCtx.assistantMessage.ID, reqCtx.resume.Prompt.ID)
+	}
 
 	// Setup stop event handler
 	h.setupStopEventHandler(eventBus, reqCtx.sessionID, reqCtx.session.TenantID, reqCtx.assistantMessage, cancel)
@@ -986,7 +1008,7 @@ func knowledgeSearchOptions(request *SearchKnowledgeRequest) (*types.KnowledgeSe
 // @Param        session_id  path      string                   true  "会话ID"
 // @Param        request     body      CreateKnowledgeQARequest true  "问答请求"
 // @Param        resource_urls  query     string  false  "文件引用形式，public 返回可加载直链"  Enums(handle, public)  default(handle)
-// @Success      200         {object}  map[string]interface{}   "问答结果（SSE流）"
+// @Success      200         {string}  string  "SSE 事件流"
 // @Failure      400         {object}  errors.AppError          "请求参数错误"
 // @Security     Bearer
 // @Security     ApiKeyAuth
@@ -1016,7 +1038,7 @@ func (h *Handler) KnowledgeQA(c *gin.Context) {
 // @Param        session_id  path      string                   true  "会话ID"
 // @Param        request     body      CreateKnowledgeQARequest true  "问答请求"
 // @Param        resource_urls  query     string  false  "文件引用形式，public 返回可加载直链"  Enums(handle, public)  default(handle)
-// @Success      200         {object}  map[string]interface{}   "问答结果（SSE流）"
+// @Success      200         {string}  string  "SSE 事件流"
 // @Failure      400         {object}  errors.AppError          "请求参数错误"
 // @Security     Bearer
 // @Security     ApiKeyAuth
@@ -1237,7 +1259,9 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 	// This is a pure UI memo (no behavioural effect) and runs in a goroutine
 	// to avoid adding a DB round-trip to TTFB. Use WithoutCancel so a fast
 	// client disconnect doesn't drop the write.
-	go h.persistLastRequestState(ctx, reqCtx, mode)
+	if reqCtx.resume == nil {
+		go h.persistLastRequestState(ctx, reqCtx, mode)
+	}
 
 	if mode == qaModeAgent {
 		if err := h.rejectIfOtherAgentRunLive(ctx, reqCtx); err != nil {
@@ -1256,6 +1280,11 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 			logger.ErrorWithFields(ctx, err, map[string]interface{}{"session_id": sessionID})
 		}
 		return
+	}
+	// A new message moves on from any prompt still waiting for an answer.
+	// Its run is closed first so the history this turn loads is well formed.
+	if reqCtx.resume == nil {
+		h.supersedeSuspendedRuns(ctx, sessionID)
 	}
 
 	releaseQATurn, held := h.holdQATurn(ctx, reqCtx)
@@ -1405,6 +1434,11 @@ func (h *Handler) executeQA(reqCtx *qaRequestContext, mode qaMode, generateTitle
 			if mode == qaModeAgent {
 				if streamCtx.releaseTurn != nil {
 					streamCtx.releaseTurn()
+				}
+				if streamCtx.streamHandler != nil {
+					if suspension := streamCtx.streamHandler.Suspension(); suspension != nil && suspension.Detached {
+						return // The new owner controls persistence and the live-run marker.
+					}
 				}
 				// Use WithoutCancel so a user-triggered stop (which cancels
 				// asyncCtx) doesn't also cancel the GORM UPDATE that persists
@@ -2013,7 +2047,23 @@ func (h *Handler) sessionTenantInfoContext(ctx context.Context) (context.Context
 func (h *Handler) completeStreamAssistantMessage(
 	ctx context.Context, streamCtx *sseStreamContext, query, userMessageID string,
 ) {
-	if err := h.completeAssistantMessage(ctx, streamCtx.assistantMessage, query, userMessageID); err != nil {
+	if streamCtx.streamHandler != nil {
+		if suspension := streamCtx.streamHandler.Suspension(); suspension != nil && suspension.Detached {
+			return
+		}
+	}
+	persist := func() error {
+		return h.completeAssistantMessage(ctx, streamCtx.assistantMessage, query, userMessageID)
+	}
+	if streamCtx.streamHandler != nil && streamCtx.streamHandler.Suspension() != nil {
+		// The turn is not over: indexing, memory and follow-ups run when the
+		// resumed run completes.
+		persist = func() error {
+			streamCtx.assistantMessage.UpdatedAt = time.Now()
+			return h.messageService.UpdateMessage(ctx, streamCtx.assistantMessage)
+		}
+	}
+	if err := persist(); err != nil {
 		if streamCtx.streamHandler != nil {
 			_ = streamCtx.streamHandler.handleError(ctx, event.Event{
 				ID: uuid.New().String(), Type: event.EventError, SessionID: streamCtx.assistantMessage.SessionID,
