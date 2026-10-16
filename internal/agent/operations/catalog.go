@@ -17,6 +17,8 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/Tencent/WeKnora/internal/types"
 )
 
 // Risk classifies an operation by its effect on user data.
@@ -53,10 +55,11 @@ type ParamType string
 
 // Parameter types.
 const (
-	TypeString     ParamType = "string"
-	TypeInteger    ParamType = "integer"
-	TypeBoolean    ParamType = "boolean"
-	TypeStringList ParamType = "string_list"
+	TypeString      ParamType = "string"
+	TypeInteger     ParamType = "integer"
+	TypeBoolean     ParamType = "boolean"
+	TypeStringList  ParamType = "string_list"
+	TypeIntegerList ParamType = "integer_list"
 )
 
 // Param is one model-facing parameter.
@@ -70,16 +73,21 @@ type Param struct {
 	In   Location
 	// Key is the wire name: the route segment, query key or body field.
 	// Defaults to Name.
-	Key         string
-	Type        ParamType
-	Required    bool
+	Key      string
+	Type     ParamType
+	Required bool
+	// AllowEmpty separates an agent-required field from an API nonempty constraint.
+	AllowEmpty  bool
 	Description string
 	Enum        []string
 	// Minimum and Maximum bound integers when Maximum > 0.
 	Minimum int
 	Maximum int
-	// MaxItems bounds string lists; defaults to defaultMaxListItems.
+	// MaxItems bounds lists; defaults to defaultMaxListItems.
 	MaxItems int
+	// MaxBytes overrides maxStringParamBytes for this string. Zero keeps the
+	// default. It cannot exceed maxAgentStringBytes.
+	MaxBytes int
 }
 
 func (p Param) wireKey() string {
@@ -97,6 +105,9 @@ type Field struct {
 	// should be renamed to the canonical handle keys so the model-context
 	// policy turns them into handles.
 	As string
+	// MaxRunes overrides the projected string length for this field. Zero
+	// keeps maxProjectedStringRunes.
+	MaxRunes int
 }
 
 func (f Field) outputKey() string {
@@ -144,6 +155,105 @@ type Operation struct {
 	// and its result labels the approval prompt. Its parameters must be a
 	// subset of this operation's.
 	Target *Target
+	// LabelParam, for a creation with nothing existing to act on, names the
+	// required string parameter (the new name) that labels the approval in
+	// place of a Target.
+	LabelParam string
+	// Role is the lowest workspace role the route's guards let through;
+	// empty takes the default for Risk. It only decides what a caller is
+	// offered: the router still authorizes every call, and a router test
+	// keeps the two in step.
+	Role types.TenantRole
+}
+
+// defaultRole is the role the route guards usually ask of an operation:
+// reading needs a viewer, changing content a contributor.
+func defaultRole(risk Risk) types.TenantRole {
+	if risk == RiskRead {
+		return types.TenantRoleViewer
+	}
+	return types.TenantRoleContributor
+}
+
+// Access is what one run may do with the catalog.
+type Access struct {
+	// Role is the caller's workspace role. It filters only when EnforceRole
+	// is set, matching the router, which skips role checks otherwise.
+	Role        types.TenantRole
+	EnforceRole bool
+	// Level is the user's assistant access level.
+	Level types.AssistantAccessLevel
+}
+
+// NeedsApproval reports whether running op must wait for the user.
+func (a Access) NeedsApproval(op Operation) bool {
+	return a.NeedsApprovalFor(op.Risk)
+}
+
+// NeedsApprovalFor reports whether a change of the given risk must wait for
+// the user; it also covers tools outside the catalog.
+func (a Access) NeedsApprovalFor(risk Risk) bool {
+	switch risk {
+	case RiskRead:
+		return false
+	case RiskWrite:
+		return a.Level != types.AssistantAccessAutoWrite
+	default:
+		return true
+	}
+}
+
+// Withholding says why an access leaves an operation out.
+type Withholding struct {
+	// ReadOnly: the user set the assistant to read-only.
+	ReadOnly bool
+	// Role is the workspace role the operation needs when the caller's falls
+	// short.
+	Role types.TenantRole
+}
+
+// Withheld reports why a leaves op out of c, if it does. A mutation whose
+// approval target is withheld is withheld for the same reason, so every
+// offered mutation can still show the user what it acts on.
+func (c *Catalog) Withheld(a Access, op Operation) (Withholding, bool) {
+	if a.Level == types.AssistantAccessReadOnly && op.Risk.Mutates() {
+		return Withholding{ReadOnly: true}, true
+	}
+	if a.EnforceRole && !a.Role.HasPermission(op.Role) {
+		return Withholding{Role: op.Role}, true
+	}
+	if t := op.Target; t != nil {
+		targets := []string{t.Operation}
+		if t.Items != nil {
+			targets = append(targets, t.Items.Operation)
+		}
+		for _, id := range targets {
+			target, ok := c.Get(id)
+			if !ok {
+				return Withholding{}, true
+			}
+			if w, withheld := c.Withheld(a, target); withheld {
+				return w, true
+			}
+		}
+	}
+	return Withholding{}, false
+}
+
+// For returns the operations a allows; see Withheld.
+func (c *Catalog) For(a Access) *Catalog {
+	if c == nil {
+		return nil
+	}
+	out := &Catalog{byID: map[string]int{}}
+	for _, op := range c.ops {
+		if _, withheld := c.Withheld(a, op); withheld {
+			continue
+		}
+		out.byID[op.ID] = len(out.ops)
+		out.ops = append(out.ops, op)
+	}
+	return out
 }
 
 // Target names the read operation that describes a mutation's subject.
@@ -151,7 +261,26 @@ type Target struct {
 	Operation string
 	// Label is the result field shown to the user (e.g. "title").
 	Label string
+	// Items, for a batch mutation, also resolves every item it acts on.
+	Items *ItemTarget
+	// RequireComplete blocks a full replacement when the target read loses data.
+	RequireComplete bool
 }
+
+// ItemTarget runs a read once per item of a list parameter, so the approval
+// names each item rather than showing IDs.
+type ItemTarget struct {
+	// Param is the mutation's list parameter; at most MaxApprovalItems long.
+	Param     string
+	Operation string
+	// As is the target parameter that receives each item.
+	As    string
+	Label string
+}
+
+// MaxApprovalItems bounds a batch whose items the approval resolves, so the
+// user sees every item they approve.
+const MaxApprovalItems = 20
 
 // Param returns the parameter declared under name.
 func (op Operation) Param(name string) (Param, bool) {
@@ -166,6 +295,10 @@ func (op Operation) Param(name string) (Param, bool) {
 const (
 	defaultMaxListItems   = 100
 	defaultMaxResultItems = 50
+	// maxDeclaredResultItems is the largest max_items an operation may
+	// declare. Unpaginated lists raise their cap explicitly; anything larger
+	// belongs behind a page parameter.
+	maxDeclaredResultItems = 500
 )
 
 var (
@@ -175,7 +308,8 @@ var (
 )
 
 // allowedRouteAreas are the first path segments under /api/v1 an operation
-// may live in: the user's knowledge content. Every other area is refused,
+// may live in: the user's knowledge content, their agents, and the models
+// and MCP services an agent can be bound to. Every other area is refused,
 // so an API added later (credentials, integrations, identity, the agent's
 // own approval and prompt endpoints) stays unreachable until it is listed
 // here on purpose. Catalog construction fails otherwise, so a careless
@@ -187,13 +321,26 @@ var allowedRouteAreas = map[string]bool{
 	"knowledgebase":          true, // Wiki
 	"chunks":                 true,
 	"faq":                    true,
+	"agents":                 true,
+	"skills":                 true,
+	// Model and MCP responses carry endpoints and headers next to the
+	// names; only fields tagged x-agent are projected, so annotate the
+	// identifying ones and nothing else.
+	"models":       true,
+	"mcp-services": true,
 }
 
 // forbiddenRouteSegments are refused anywhere inside an allowed area:
-// sharing changes who can reach a knowledge base, which the user does
+// sharing and publishing change who can reach a knowledge base or agent,
+// and credentials never pass through the model; the user handles these
 // themselves.
 var forbiddenRouteSegments = map[string]bool{
-	"shares": true,
+	"shares":         true,
+	"embed-channels": true,
+	"im-channels":    true,
+	"credentials":    true,
+	"oauth":          true,
+	"catalog":        true,
 }
 
 var allowedMethods = map[string]bool{
@@ -211,6 +358,11 @@ type Catalog struct {
 func NewCatalog(ops ...Operation) (*Catalog, error) {
 	c := &Catalog{ops: append([]Operation(nil), ops...), byID: make(map[string]int, len(ops))}
 	sort.Slice(c.ops, func(i, j int) bool { return c.ops[i].ID < c.ops[j].ID })
+	for i := range c.ops {
+		if c.ops[i].Role == "" {
+			c.ops[i].Role = defaultRole(c.ops[i].Risk)
+		}
+	}
 	for i, op := range c.ops {
 		if _, dup := c.byID[op.ID]; dup {
 			return nil, fmt.Errorf("operation %q declared twice", op.ID)
@@ -321,8 +473,20 @@ func validateOperation(op Operation) error {
 	if op.Method == http.MethodDelete && op.Risk != RiskDestructive {
 		return fmt.Errorf("DELETE operations must be destructive")
 	}
-	if op.Risk.Mutates() && op.Target == nil {
+	if op.Risk.Mutates() && op.Target == nil && op.LabelParam == "" {
 		return fmt.Errorf("mutating operations must declare a target")
+	}
+	if op.LabelParam != "" {
+		if op.Target != nil || op.Risk != RiskWrite || op.Method != http.MethodPost {
+			return fmt.Errorf("label_param is for a POST write without a target")
+		}
+		p, ok := op.Param(op.LabelParam)
+		if !ok || p.Type != TypeString || !p.Required {
+			return fmt.Errorf("label_param %q must be a required string param", op.LabelParam)
+		}
+	}
+	if !op.Role.IsValid() {
+		return fmt.Errorf("invalid role %q", op.Role)
 	}
 	routeParams, err := parseRoute(op.Route)
 	if err != nil {
@@ -344,7 +508,7 @@ func validateOperation(op Operation) error {
 			return fmt.Errorf("param %q: description is required", p.Name)
 		}
 		switch p.Type {
-		case TypeString, TypeInteger, TypeBoolean, TypeStringList:
+		case TypeString, TypeInteger, TypeBoolean, TypeStringList, TypeIntegerList:
 		default:
 			return fmt.Errorf("param %q: invalid type %q", p.Name, p.Type)
 		}
@@ -354,10 +518,17 @@ func validateOperation(op Operation) error {
 		if p.Maximum > 0 && (p.Type != TypeInteger || p.Minimum > p.Maximum) {
 			return fmt.Errorf("param %q: invalid integer bounds", p.Name)
 		}
+		if p.MaxBytes != 0 && (p.Type != TypeString && p.Type != TypeStringList ||
+			p.MaxBytes < 1 || p.MaxBytes > maxAgentStringBytes) {
+			return fmt.Errorf("param %q: invalid string length", p.Name)
+		}
 		switch p.In {
 		case InPath:
-			if p.Type != TypeString || !p.Required {
-				return fmt.Errorf("path param %q must be a required string", p.Name)
+			if (p.Type != TypeString && p.Type != TypeInteger) || !p.Required {
+				return fmt.Errorf("path param %q must be a required string or integer", p.Name)
+			}
+			if p.Type == TypeInteger && strings.HasSuffix(op.Route, "/*"+p.wireKey()) {
+				return fmt.Errorf("path param %q: a catch-all must be a string", p.Name)
 			}
 			if _, ok := routeParams[p.wireKey()]; !ok {
 				return fmt.Errorf("path param %q has no route segment %q", p.Name, p.wireKey())
@@ -365,7 +536,7 @@ func validateOperation(op Operation) error {
 			pathParams[p.wireKey()] = true
 		case InQuery:
 		case InBody:
-			if op.Method == http.MethodGet || op.Method == http.MethodDelete {
+			if op.Method == http.MethodGet {
 				return fmt.Errorf("param %q: %s requests carry no body", p.Name, op.Method)
 			}
 		default:
@@ -385,6 +556,9 @@ func validateOperation(op Operation) error {
 		}
 	}
 
+	if op.Result.MaxItems < 0 || op.Result.MaxItems > maxDeclaredResultItems {
+		return fmt.Errorf("max_items must be between 0 and %d", maxDeclaredResultItems)
+	}
 	if op.Result.List && op.Result.Root == "" && len(op.Result.Meta) > 0 {
 		return fmt.Errorf("a list result at the body root cannot have meta fields")
 	}
@@ -406,9 +580,38 @@ func (c *Catalog) validateTarget(op Operation) error {
 	if op.Target == nil {
 		return nil
 	}
-	target, ok := c.Get(op.Target.Operation)
+	if err := c.validateRead(op, op.Target.Operation, op.Target.Label, "", ""); err != nil {
+		return err
+	}
+	items := op.Target.Items
+	if items == nil {
+		return nil
+	}
+	list, ok := op.Param(items.Param)
+	if !ok || !list.Required || (list.Type != TypeStringList && list.Type != TypeIntegerList) {
+		return fmt.Errorf("target items %q must be a required list", items.Param)
+	}
+	if list.MaxItems <= 0 || list.MaxItems > MaxApprovalItems {
+		return fmt.Errorf("target items %q must be capped at %d or fewer", items.Param, MaxApprovalItems)
+	}
+	return c.validateRead(op, items.Operation, items.Label, items.As, list.itemType())
+}
+
+// itemType is the type of one element of a list param.
+func (p Param) itemType() ParamType {
+	if p.Type == TypeIntegerList {
+		return TypeInteger
+	}
+	return TypeString
+}
+
+// validateRead checks a target read of op: a single-object read whose
+// parameters op supplies (item, if set, is filled per item instead, with
+// itemType) and whose result has label.
+func (c *Catalog) validateRead(op Operation, id, label, item string, itemType ParamType) error {
+	target, ok := c.Get(id)
 	if !ok {
-		return fmt.Errorf("target %q is not in the catalog", op.Target.Operation)
+		return fmt.Errorf("target %q is not in the catalog", id)
 	}
 	if target.Risk != RiskRead {
 		return fmt.Errorf("target %q must be a read operation", target.ID)
@@ -416,7 +619,19 @@ func (c *Catalog) validateTarget(op Operation) error {
 	if target.Result.List {
 		return fmt.Errorf("target %q must return a single object", target.ID)
 	}
+	if item != "" {
+		p, ok := target.Param(item)
+		if !ok || p.Type != itemType || !p.Required {
+			return fmt.Errorf("target %q has no required %s param %q for each item", target.ID, itemType, item)
+		}
+		if _, clash := op.Param(item); clash {
+			return fmt.Errorf("target item param %q is also a param of %q", item, op.ID)
+		}
+	}
 	for _, p := range target.Params {
+		if p.Name == item {
+			continue
+		}
 		own, ok := op.Param(p.Name)
 		if !ok || own.Type != p.Type {
 			return fmt.Errorf("target param %q is not declared with the same type", p.Name)
@@ -425,16 +640,12 @@ func (c *Catalog) validateTarget(op Operation) error {
 			return fmt.Errorf("target param %q is required by the target", p.Name)
 		}
 	}
-	labelled := false
 	for _, f := range target.Result.Fields {
-		if f.outputKey() == op.Target.Label {
-			labelled = true
+		if f.outputKey() == label {
+			return nil
 		}
 	}
-	if !labelled {
-		return fmt.Errorf("target label %q is not a result field of %q", op.Target.Label, target.ID)
-	}
-	return nil
+	return fmt.Errorf("target label %q is not a result field of %q", label, target.ID)
 }
 
 // parseRoute checks that route is a clean absolute path in an allowed area
