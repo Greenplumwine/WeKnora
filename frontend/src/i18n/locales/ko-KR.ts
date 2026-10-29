@@ -7134,6 +7134,14 @@ export default {
     baseUrlLabel: '인스턴스 URL',
     baseUrlPlaceholder: 'https://searxng.example.com',
     apiKeyPlaceholder: 'API 키를 입력하세요',
+    clients: {
+      label: '검색 및 페이지 읽기',
+      search: '검색',
+      fetch: '페이지 읽기',
+      viaApi: '{name} API',
+      local: '내장 페이지 리더',
+      help: '검색 결과는 이 프로바이더에서 가져오며, 에이전트는 위의 방식으로 페이지 본문을 읽습니다.'
+    },
     toasts: {
       providerCreated: '검색 엔진 프로바이더가 생성되었습니다',
       providerUpdated: '검색 엔진 프로바이더가 업데이트되었습니다',
@@ -8984,6 +8992,11 @@ export default {
       }
     }
   },
+  assistantEntryGuide: {
+    stepOf: 'v0.9.0의 새로운 기능',
+    skip: '알겠습니다',
+    interactHint: '강조된 아이콘을 클릭해 어시스턴트를 열어 보세요.',
+  },
   newUserGuide: {
     stepOf: '{current} / {total}',
     skip: '건너뛰기',
@@ -8992,6 +9005,10 @@ export default {
     done: '완료',
     reopen: '사용 가이드',
     steps: {
+      assistant: {
+        title: 'WeKnora 어시스턴트를 만나보세요',
+        desc: 'WeKnora의 버전, 기능, 설정에 대해 질문할 수 있습니다. 현재 페이지를 바탕으로 사용자의 권한 내에서 에이전트를 만들고, 작업을 예약하고, 지식을 정리할 수도 있습니다.'
+      },
       done: {
         title: '준비 완료',
         desc: '핵심 기능을 모두 익혔습니다. 이제 나만의 지식 어시스턴트를 만들어 보세요! 메뉴 상단 닉네임 옆 도움말 버튼에서 언제든 가이드를 다시 볼 수 있습니다.'

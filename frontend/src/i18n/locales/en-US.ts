@@ -609,6 +609,11 @@ export default {
       references: 'References'
     }
   },
+  assistantEntryGuide: {
+    stepOf: 'NEW IN v0.9.0',
+    skip: 'Got it',
+    interactHint: 'Click the highlighted entry to open the assistant.',
+  },
   newUserGuide: {
     stepOf: '{current} / {total}',
     skip: 'Skip',
@@ -617,6 +622,10 @@ export default {
     done: 'Done',
     reopen: 'Product tour',
     steps: {
+      assistant: {
+        title: 'Meet the WeKnora Assistant',
+        desc: 'Ask about WeKnora versions, features and setup. Using the current page as context, the assistant can create agents, schedule tasks and organize knowledge on your behalf, within your permissions.'
+      },
       welcome: {
         title: 'Welcome to WeKnora',
         desc: 'A few quick steps to get you familiar with knowledge bases, chat and agents. Click "Next" to begin.'
@@ -2519,6 +2528,14 @@ export default {
     baseUrlLabel: 'Instance URL',
     baseUrlPlaceholder: 'https://searxng.example.com',
     apiKeyPlaceholder: 'Enter API key',
+    clients: {
+      label: 'Search & page reading',
+      search: 'Search',
+      fetch: 'Page reading',
+      viaApi: '{name} API',
+      local: 'Built-in page reader',
+      help: 'Search results come from this provider; agents read page content with the reader above.'
+    },
     toasts: {
       providerCreated: 'Search provider created',
       providerUpdated: 'Search provider updated',

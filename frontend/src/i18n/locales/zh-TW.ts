@@ -7135,6 +7135,14 @@ export default {
     baseUrlLabel: '實例地址',
     baseUrlPlaceholder: 'https://searxng.example.com',
     apiKeyPlaceholder: '請輸入 API 金鑰',
+    clients: {
+      label: '搜尋與網頁讀取',
+      search: '搜尋',
+      fetch: '網頁讀取',
+      viaApi: '{name} API',
+      local: '內建網頁讀取器',
+      help: '搜尋結果由該引擎回傳；智慧體讀取網頁內文時使用上方的網頁讀取方式。'
+    },
     toasts: {
       providerCreated: '搜尋引擎設定已建立',
       providerUpdated: '搜尋引擎設定已更新',
@@ -8985,6 +8993,11 @@ export default {
       }
     }
   },
+  assistantEntryGuide: {
+    stepOf: 'v0.9.0 新功能',
+    skip: '知道了',
+    interactHint: '點擊反白的入口，開啟助手試試。',
+  },
   newUserGuide: {
     stepOf: '{current} / {total}',
     skip: '跳過引導',
@@ -8993,6 +9006,10 @@ export default {
     done: '完成',
     reopen: '新手引導',
     steps: {
+      assistant: {
+        title: '認識 WeKnora 助手',
+        desc: '可以詢問 WeKnora 的版本、功能與設定，也可以結合目前頁面，以你的身分建立智慧代理、設定定時任務或整理知識。'
+      },
       done: {
         title: '一切就緒',
         desc: '你已經了解了核心功能，現在就開始建構你的知識助手吧！隨時可點擊選單頂部暱稱旁的幫助按鈕重新查看引導。'

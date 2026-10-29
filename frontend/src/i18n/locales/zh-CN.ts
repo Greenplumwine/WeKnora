@@ -7135,6 +7135,14 @@ export default {
     baseUrlLabel: '实例地址',
     baseUrlPlaceholder: 'https://searxng.example.com',
     apiKeyPlaceholder: '请输入 API 密钥',
+    clients: {
+      label: '搜索与网页读取',
+      search: '搜索',
+      fetch: '网页读取',
+      viaApi: '{name} API',
+      local: '内置网页读取器',
+      help: '搜索结果由该引擎返回；智能体读取网页正文时使用上面的网页读取方式。'
+    },
     toasts: {
       providerCreated: '搜索引擎配置已创建',
       providerUpdated: '搜索引擎配置已更新',
@@ -8985,6 +8993,11 @@ export default {
       }
     }
   },
+  assistantEntryGuide: {
+    stepOf: 'v0.9.0 新功能',
+    skip: '知道了',
+    interactHint: '点击高亮入口，打开助手试试。',
+  },
   newUserGuide: {
     stepOf: '{current} / {total}',
     skip: '跳过引导',
@@ -8993,6 +9006,10 @@ export default {
     done: '完成',
     reopen: '新手引导',
     steps: {
+      assistant: {
+        title: '认识 WeKnora 助手',
+        desc: '可以问 WeKnora 的版本、功能和配置，也可以结合当前页面，以你的身份创建智能体、设置定时任务或整理知识。'
+      },
       done: {
         title: '一切就绪',
         desc: '你已经了解了核心功能，现在就开始构建你的知识助手吧！随时可点击菜单顶部昵称旁的帮助按钮重新查看引导。'

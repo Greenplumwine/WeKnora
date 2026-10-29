@@ -609,6 +609,11 @@ export default {
       references: '出典'
     }
   },
+  assistantEntryGuide: {
+    stepOf: 'v0.9.0 の新機能',
+    skip: 'わかりました',
+    interactHint: '強調表示された入口をクリックしてアシスタントを開いてみましょう。',
+  },
   newUserGuide: {
     stepOf: '{current} / {total}',
     skip: 'スキップ',
@@ -617,6 +622,10 @@ export default {
     done: '完了',
     reopen: 'プロダクトツアー',
     steps: {
+      assistant: {
+        title: 'WeKnora アシスタントのご紹介',
+        desc: 'WeKnora のバージョン、機能、設定について質問できます。現在のページをもとに、あなたの権限でエージェントの作成、定期タスクの設定、ナレッジの整理も行えます。'
+      },
       welcome: {
         title: 'WeKnoraへようこそ',
         desc: '数ステップでナレッジベース、チャット、エージェントの使い方をご紹介します。「次へ」をクリックして開始してください。'
@@ -2519,6 +2528,14 @@ export default {
     baseUrlLabel: 'インスタンスURL',
     baseUrlPlaceholder: 'https://searxng.example.com',
     apiKeyPlaceholder: 'APIキーを入力',
+    clients: {
+      label: '検索とページ読み取り',
+      search: '検索',
+      fetch: 'ページ読み取り',
+      viaApi: '{name} API',
+      local: '内蔵ページリーダー',
+      help: '検索結果はこのプロバイダから取得し、エージェントは上記の方法でページ本文を読み取ります。'
+    },
     toasts: {
       providerCreated: '検索プロバイダを作成しました',
       providerUpdated: '検索プロバイダを更新しました',
